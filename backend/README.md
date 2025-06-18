@@ -1,38 +1,100 @@
-# TensorBoard集成
+# Visual ML Model Builder - Backend
 
-这个后端服务提供了将流程图生成的模型结构转换为TensorBoard可视化的功能。
+基于FastAPI的机器学习模型构建后端，支持TensorFlow和PyTorch框架。
 
-## 运行步骤
+## 功能特性
 
-1. 安装Node.js依赖：
+- 🔧 **多框架支持**: 同时支持TensorFlow和PyTorch
+- 🚀 **异步训练**: 支持异步模型训练和实时进度反馈
+- 🔄 **实时通信**: WebSocket支持实时训练状态更新
+- 📊 **模型管理**: 完整的会话管理和模型生命周期
+- 📤 **模型导出**: 支持多种格式的模型导出
+- 🎯 **RESTful API**: 完整的REST API接口
+
+## 快速开始
+
+### 1. 安装依赖
 
 ```bash
-cd backend
-npm install
+pip install -r requirements_ml.txt
 ```
 
-2. 启动后端服务：
+### 2. 启动服务器
 
 ```bash
-npm run dev
+# 使用启动脚本（推荐）
+python start_ml_backend.py
+
+# 或直接启动
+uvicorn ml_backend:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-服务将在端口5001上运行。
+### 3. 访问API文档
 
-## TensorBoard功能
+- 服务器地址: http://localhost:8000
+- API文档: http://localhost:8000/docs
+- 交互式文档: http://localhost:8000/redoc
 
-当用户在前端页面中点击"查看TensorBoard"按钮时，服务将：
+## API 端点
 
-1. 从前端接收模型结构数据
-2. 自动设置Python虚拟环境（如果尚未设置）
-3. 转换模型结构为TensorFlow模型
-4. 进行模拟训练并生成TensorBoard日志
-5. 启动TensorBoard服务（默认在端口6006上）
-6. 通知用户在浏览器中打开http://localhost:6006访问TensorBoard
+### 模型管理
+- `POST /api/models/create` - 创建模型
+- `POST /api/models/train` - 训练模型
+- `POST /api/models/predict` - 模型推理
+- `GET /api/models/export/{session_id}` - 导出模型
 
-## 技术细节
+### 会话管理
+- `GET /api/sessions/{session_id}` - 获取会话信息
+- `DELETE /api/sessions/{session_id}` - 删除会话
 
-- 使用Node.js的child_process模块管理Python进程和TensorBoard服务
-- 自动创建和管理Python虚拟环境
-- 使用TensorFlow.js的模型结构转换为TensorFlow Python模型
-- 支持所有常见的神经网络层类型 
+### 实时通信
+- `WebSocket /ws/{session_id}` - 实时训练进度
+
+## 架构说明
+
+### 核心组件
+
+1. **ml_backend.py** - FastAPI主应用
+2. **ml_session_manager.py** - 会话管理器
+3. **ml_converters/** - 模型转换器
+   - `tensorflow_converter.py` - TensorFlow转换器
+   - `pytorch_converter.py` - PyTorch转换器
+
+### 数据流
+
+```
+前端可视化界面 → API请求 → 模型转换器 → 训练执行 → 实时反馈 → 前端更新
+```
+
+## 支持的层类型
+
+- **卷积层**: Conv2D, MaxPooling2D, AvgPooling2D
+- **全连接层**: Dense, Dropout
+- **规范化层**: BatchNormalization
+- **循环层**: LSTM, GRU
+- **工具层**: Flatten, Activation, Reshape
+
+## 开发指南
+
+### 添加新的层类型
+
+1. 在转换器中添加层创建方法
+2. 更新 `supported_layers` 字典
+3. 实现代码生成逻辑
+
+### 扩展框架支持
+
+1. 创建新的转换器类
+2. 实现必要的接口方法
+3. 在主应用中注册转换器
+
+## 环境要求
+
+- Python 3.8+
+- TensorFlow 2.15+ (可选)
+- PyTorch 2.1+ (可选)
+- FastAPI 0.104+
+
+## 许可证
+
+MIT License 
