@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Flow from '@/components/Flow';
+import MLFlowEditor from './components/Flow/MLFlowEditor';
+import MLLayerBar from './components/Dnd/MLLayerBar';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { ReactFlowProvider } from '@xyflow/react';
@@ -21,6 +23,20 @@ function App() {
               
               {/* 受保护的流程编辑器页面 */}
               <Route path="/flow" element={
+                <ProtectedRoute>
+                  <div className="flex flex-col h-full w-full overflow-hidden">
+                    <div className="flex flex-1 overflow-hidden">
+                      <MLLayerBar />
+                      <div className="flex-1 h-full">
+                        <MLFlowEditor />
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+              
+              {/* 传统流程编辑器页面 */}
+              <Route path="/flow-legacy" element={
                 <ProtectedRoute>
                   <div className="flex flex-col h-full w-full overflow-hidden">
                     <div className="flex flex-1 overflow-hidden">
