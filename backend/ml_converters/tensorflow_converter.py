@@ -3,7 +3,6 @@ TensorFlow Model Converter
 将可视化模型结构转换为TensorFlow模型并执行训练
 """
 
-import tensorflow as tf
 import numpy as np
 from typing import List, Dict, Any, Callable, Optional
 import logging
@@ -12,12 +11,22 @@ import json
 import os
 from datetime import datetime
 
+# 可选导入TensorFlow
+try:
+    import tensorflow as tf
+    HAS_TENSORFLOW = True
+except ImportError:
+    HAS_TENSORFLOW = False
+
 logger = logging.getLogger(__name__)
 
 class TensorFlowConverter:
     """TensorFlow模型转换器"""
     
     def __init__(self):
+        if not HAS_TENSORFLOW:
+            logger.warning("TensorFlow未安装，TensorFlow功能将不可用")
+        
         self.supported_layers = {
             'conv2d': self._create_conv2d,
             'maxPooling2d': self._create_max_pooling2d,
@@ -34,6 +43,9 @@ class TensorFlowConverter:
         
     def convert_model_structure(self, layers: List[Dict], connections: List[Dict]) -> str:
         """将可视化模型结构转换为TensorFlow代码"""
+        if not HAS_TENSORFLOW:
+            raise ImportError("TensorFlow未安装，无法使用TensorFlow转换功能")
+            
         try:
             # 分析模型结构
             model_info = self._analyze_model_structure(layers, connections)

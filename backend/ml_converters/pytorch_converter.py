@@ -3,9 +3,6 @@ PyTorch Model Converter
 将可视化模型结构转换为PyTorch模型并执行训练
 """
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import numpy as np
 from typing import List, Dict, Any, Callable, Optional
 import logging
@@ -13,12 +10,24 @@ import asyncio
 import os
 from datetime import datetime
 
+# 可选导入PyTorch
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    HAS_PYTORCH = True
+except ImportError:
+    HAS_PYTORCH = False
+
 logger = logging.getLogger(__name__)
 
 class PyTorchConverter:
     """PyTorch模型转换器"""
     
     def __init__(self):
+        if not HAS_PYTORCH:
+            logger.warning("PyTorch未安装，PyTorch功能将不可用")
+            
         self.supported_layers = {
             'conv2d': self._create_conv2d,
             'maxPooling2d': self._create_max_pooling2d,
@@ -35,6 +44,9 @@ class PyTorchConverter:
         
     def convert_model_structure(self, layers: List[Dict], connections: List[Dict]) -> str:
         """将可视化模型结构转换为PyTorch代码"""
+        if not HAS_PYTORCH:
+            raise ImportError("PyTorch未安装，无法使用PyTorch转换功能")
+            
         try:
             # 分析模型结构
             model_info = self._analyze_model_structure(layers, connections)
