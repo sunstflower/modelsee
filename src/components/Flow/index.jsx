@@ -17,6 +17,7 @@ import { generateModelCode, validateModelStructure, generateModelStructureFromGr
 import { validateConnection, calculateModelShapes, getLayerShapeDescription, getLayerDescription } from '@/utils/layerValidation';
 import LayerTooltip from '../Tooltip/LayerTooltip';
 import projectService from '../../services/projectService';
+import mlBackendService from '../../services/mlBackendService';
 import Header from '../Header';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -122,6 +123,11 @@ function FlowComponent() {
   const prevElementsLength = useRef(0);
   const prevEdgesLength = useRef(0);
   
+  // 后端会话管理状态
+  const [sessionId, setSessionId] = useState(null);
+  const [backendStatus, setBackendStatus] = useState('connecting'); // 'connecting', 'connected', 'error'
+  const [backendLayers, setBackendLayers] = useState({});
+  
   const { 
     nodes, 
     addNode, 
@@ -157,6 +163,52 @@ function FlowComponent() {
   const [tooltipInfo, setTooltipInfo] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [showTooltip, setShowTooltip] = useState(false);
+  
+  // 初始化后端连接和会话
+  useEffect(() => {
+    const initializeBackend = async () => {
+      try {
+        setBackendStatus('connecting');
+        
+        // 检查后端健康状态
+        const health = await mlBackendService.checkHealth();
+        if (health.status !== 'healthy') {
+          throw new Error('Backend is not healthy');
+        }
+        
+        // 创建新会话
+        const sessionResponse = await mlBackendService.createSession(
+          currentProject?.name || `Flow Session ${Date.now()}`,
+          'Visual ML model building session'
+        );
+        
+        if (sessionResponse.success) {
+          setSessionId(sessionResponse.session_id);
+          console.log('Backend session created:', sessionResponse.session_id);
+        }
+        
+        // 加载层组件信息
+        const layersResponse = await mlBackendService.getAllLayers();
+        if (layersResponse.success) {
+          setBackendLayers(layersResponse.layers.layers);
+        }
+        
+        setBackendStatus('connected');
+      } catch (error) {
+        console.error('Failed to initialize backend:', error);
+        setBackendStatus('error');
+      }
+    };
+    
+    initializeBackend();
+    
+    // 清理函数：组件卸载时删除会话
+    return () => {
+      if (sessionId) {
+        mlBackendService.deleteSession(sessionId).catch(console.error);
+      }
+    };
+  }, [currentProject?.name]);
   
   // 从URL加载项目
   useEffect(() => {
@@ -790,22 +842,111 @@ function FlowComponent() {
     }
   }, [addNode, conv2dConfigs.length, maxPooling2dConfigs.length, denseConfigs.length, elements, edges]);
 
+  // 新的节点处理函数，支持后端层信息
+  const handleAddNodeFromBackend = useCallback((layerType, position, layerInfo) => {
+    console.log('Adding node from backend:', { layerType, position, layerInfo });
+    
+    const nodeId = `${layerType}-${Date.now()}`;
+    const sequenceId = elements.length;
+    
+    // 创建节点基础结构
+    const baseNode = {
+      id: nodeId,
+      type: layerType,
+      position: position,
+      data: { 
+        index: 0,
+        sequenceId: sequenceId,
+        layerInfo: layerInfo,
+        backendType: layerType
+      }
+    };
+    
+    // 根据层类型设置特定配置
+    let configIndex = 0;
+    switch (layerType) {
+      case 'conv2d':
+        configIndex = conv2dConfigs.length;
+        break;
+      case 'maxpool2d':
+      case 'maxpooling2d':
+        configIndex = maxPooling2dConfigs.length;
+        break;
+      case 'dense':
+      case 'linear':
+        configIndex = denseConfigs.length;
+        break;
+      case 'dropout':
+        configIndex = dropoutConfigs.length;
+        break;
+      case 'batch_normalization':
+      case 'batchNorm':
+        configIndex = batchNormConfigs.length;
+        break;
+      case 'flatten':
+        configIndex = flattenConfigs.length;
+        break;
+      case 'lstm':
+        configIndex = lstmConfigs.length;
+        break;
+      case 'gru':
+        configIndex = gruConfigs.length;
+        break;
+      case 'reshape':
+        configIndex = reshapeConfigs.length;
+        break;
+      default:
+        configIndex = 0;
+    }
+    
+    baseNode.data.index = configIndex;
+    
+    // 添加节点到store和本地状态
+    addNode(layerType, configIndex, nodeId);
+    setElements((els) => [...els, baseNode]);
+    
+    // 尝试自动连接到前一个节点
+    const newEdges = tryConnectToLastNode(baseNode, elements);
+    if (newEdges.length > 0) {
+      setEdges(edges => [...edges, ...newEdges]);
+    }
+    
+    console.log('Node added successfully:', baseNode);
+  }, [addNode, conv2dConfigs.length, maxPooling2dConfigs.length, denseConfigs.length, 
+      dropoutConfigs.length, batchNormConfigs.length, flattenConfigs.length,
+      lstmConfigs.length, gruConfigs.length, reshapeConfigs.length, elements, edges]);
+
   // 使用ReactDnD处理拖拽
   const [{ isOver }, drop] = useDrop({
-    accept: ['conv2d', 'maxPooling2d', 'dense', 'trainButton', 'useData', 'mnist', 'dropout', 'batchNorm', 'flatten', 'lstm', 'activation', 'avgPooling2d', 'gru', 'reshape'],
+    accept: 'layer',
     drop(item, monitor) {
       if (!reactFlowInstance) return;
       
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
-      const position = monitor.getClientOffset();
+      console.log('Dropped item:', item);
       
-      // 计算拖拽放置的位置（直接使用相对于ReactFlow容器的位置）
-      // 这种方法不考虑缩放或平移，但作为基本功能能够工作
-      const flowX = position.x - reactFlowBounds.left;
-      const flowY = position.y - reactFlowBounds.top;
+      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
+      const clientOffset = monitor.getClientOffset();
+      
+      if (!clientOffset || !reactFlowBounds) return;
+      
+      // 计算相对于ReactFlow容器的位置
+      const relativeX = clientOffset.x - reactFlowBounds.left;
+      const relativeY = clientOffset.y - reactFlowBounds.top;
+      
+      // 使用ReactFlow的screenToFlowPosition进行正确的坐标转换
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: relativeX,
+        y: relativeY,
+      });
+      
+      console.log('Calculated position:', position);
+      
+      // 使用后端层信息或降级到本地处理
+      const layerType = item.layerType || item.type;
+      const layerInfo = backendLayers[layerType] || item.data || {};
       
       // 添加新节点到指定位置
-      handleAddNode(item.type, { x: flowX, y: flowY });
+      handleAddNodeFromBackend(layerType, position, layerInfo);
     },
     collect: (monitor) => ({
       isOver: !!monitor.isOver(),
@@ -1098,6 +1239,21 @@ function FlowComponent() {
           <Panel position="top-right">
             <div className="bg-white p-3 rounded-xl shadow-md">
               <h3 className="text-sm font-medium text-gray-800">Drag & Drop Components</h3>
+              <div className="mt-2 flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  backendStatus === 'connected' ? 'bg-green-500' : 
+                  backendStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                }`}></div>
+                <span className="text-xs text-gray-600">
+                  Backend: {backendStatus === 'connected' ? 'Connected' : 
+                           backendStatus === 'connecting' ? 'Connecting...' : 'Error'}
+                </span>
+              </div>
+              {sessionId && (
+                <div className="text-xs text-gray-500 mt-1">
+                  Session: {sessionId.slice(0, 8)}...
+                </div>
+              )}
             </div>
           </Panel>
           <Panel position="bottom-center">

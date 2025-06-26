@@ -1,143 +1,255 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import NodeContainer from '../NodeContainer';
 import useStore from '@/store';
 
+// 配置字段提示信息
+const FIELD_TOOLTIPS = {
+  pool_size: "池化窗口大小，决定每次池化操作覆盖的区域。常用2x2或3x3。",
+  strides: "池化步长，控制池化窗口移动的步长。通常与池化大小相同以避免重叠。",
+  padding: "填充方式。'valid'不填充，'same'填充保持输出尺寸。",
+  data_format: "数据格式，指定输入张量的维度顺序。"
+};
+
+// 配置选项
 const POOL_SIZE_OPTIONS = [
-  { value: '2,2', label: '2x2' },
-  { value: '3,3', label: '3x3' },
-  { value: '4,4', label: '4x4' },
+  { value: [2, 2], label: '2×2', description: '最常用的池化大小，减半特征图尺寸' },
+  { value: [3, 3], label: '3×3', description: '较大的池化窗口，更强的降采样' },
+  { value: [4, 4], label: '4×4', description: '大池化窗口，显著减少特征图尺寸' },
+  { value: [1, 1], label: '1×1', description: '无池化效果，保持原始尺寸' }
 ];
 
 const PADDING_OPTIONS = [
-  { value: 'valid', label: 'Valid' },
-  { value: 'same', label: 'Same' },
+  { value: 'valid', label: 'Valid (无填充)', description: '不进行填充，输出尺寸会减小' },
+  { value: 'same', label: 'Same (保持尺寸)', description: '填充使输出尺寸与输入相同' }
 ];
 
-// 辅助函数：将数组转换为字符串
-const arrayToString = (arr) => {
-  if (Array.isArray(arr)) {
-    return arr.join(',');
-  }
-  return String(arr);
-};
+const DATA_FORMAT_OPTIONS = [
+  { value: 'channels_last', label: 'Channels Last (NHWC)' },
+  { value: 'channels_first', label: 'Channels First (NCHW)' }
+];
 
-// 辅助函数：将字符串转换为数组
-const stringToArray = (str) => {
-  if (typeof str === 'string') {
-    return str.split(',').map(item => parseInt(item.trim(), 10));
-  }
-  return str;
+// 输入字段组件
+const InputField = ({ label, tooltip, children, required = false }) => (
+  <div className="space-y-2">
+    <label className="flex items-center text-sm font-medium text-gray-700">
+      {label}
+      {required && <span className="text-red-500 ml-1">*</span>}
+      <div className="group relative ml-2">
+        <svg className="w-4 h-4 text-gray-400 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+        </svg>
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none w-64 z-10">
+          {tooltip}
+        </div>
+      </div>
+    </label>
+    {children}
+  </div>
+);
+
+// 尺寸选择组件
+const SizeSelector = ({ value, onChange, options, placeholder = "[2, 2]" }) => {
+  const isCustom = !options.some(opt => 
+    Array.isArray(opt.value) && Array.isArray(value) && 
+    opt.value.length === value.length && 
+    opt.value.every((v, i) => v === value[i])
+  );
+
+  const handleSelectChange = (e) => {
+    const selectedValue = e.target.value;
+    if (selectedValue === 'custom') return;
+    
+    const option = options.find(opt => JSON.stringify(opt.value) === selectedValue);
+    if (option) {
+      onChange(option.value);
+    }
+  };
+
+  const handleCustomChange = (e) => {
+    const val = e.target.value;
+    try {
+      if (val.includes(',') || val.includes('[')) {
+        const parsed = JSON.parse(val.replace(/[^\d,\[\]]/g, ''));
+        onChange(Array.isArray(parsed) ? parsed : [parsed, parsed]);
+      } else {
+        const num = parseInt(val);
+        onChange(isNaN(num) ? [2, 2] : [num, num]);
+      }
+    } catch {
+      onChange([2, 2]);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <select
+        value={isCustom ? 'custom' : JSON.stringify(value)}
+        onChange={handleSelectChange}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+      >
+        {options.map(option => (
+          <option key={JSON.stringify(option.value)} value={JSON.stringify(option.value)}>
+            {option.label}
+          </option>
+        ))}
+        <option value="custom">自定义</option>
+      </select>
+      
+      {isCustom && (
+        <input
+          type="text"
+          value={Array.isArray(value) ? `[${value.join(', ')}]` : value}
+          onChange={handleCustomChange}
+          placeholder={placeholder}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+        />
+      )}
+      
+      <div className="text-xs text-gray-500">
+        {options.find(opt => JSON.stringify(opt.value) === JSON.stringify(value))?.description || '自定义尺寸'}
+      </div>
+    </div>
+  );
 };
 
 function MaxPooling2DNode({ data }) {
   const { maxPooling2dConfigs, updateMaxPooling2dConfig } = useStore();
   const configIndex = data.index || 0;
-  const config = maxPooling2dConfigs[configIndex] || {
-    poolSize: [2, 2],
-    strides: [2, 2],
-    padding: 'valid',
-  };
-
-  // 使用状态来存储字符串形式的值，用于UI显示
-  const [poolSizeStr, setPoolSizeStr] = useState('');
-  const [stridesStr, setStridesStr] = useState('');
-  const [padding, setPadding] = useState(config.padding || 'valid');
-
-  // 初始化和同步配置数据
+  const isInitialized = useRef(false);
+  
+  // 初始化配置
   useEffect(() => {
-    if (config) {
-      // 确保存储的是字符串形式
-      setPoolSizeStr(arrayToString(config.poolSize));
-      setStridesStr(arrayToString(config.strides));
-      setPadding(config.padding || 'valid');
+    if (isInitialized.current || (maxPooling2dConfigs[configIndex] && maxPooling2dConfigs[configIndex].pool_size)) {
+      isInitialized.current = true;
+      return;
     }
-  }, [config]);
-
-  const handlePoolSizeChange = (e) => {
-    const valueStr = e.target.value;
-    setPoolSizeStr(valueStr);
     
-    // 更新store中的配置，转换回数组形式
-    const valueArray = stringToArray(valueStr);
-    updateMaxPooling2dConfig(configIndex, { ...config, poolSize: valueArray });
-  };
-
-  const handleStridesChange = (e) => {
-    const valueStr = e.target.value;
-    setStridesStr(valueStr);
+    isInitialized.current = true;
     
-    // 尝试解析为数组，如果是有效格式
-    try {
-      const valueArray = stringToArray(valueStr);
-      updateMaxPooling2dConfig(configIndex, { ...config, strides: valueArray });
-    } catch (error) {
-      console.error('无效的步长格式:', error);
-    }
+    // 根据后端数据结构设置默认值
+    const defaultConfig = {
+      pool_size: [2, 2],
+      strides: null, // null表示使用与pool_size相同的值
+      padding: 'valid',
+      data_format: 'channels_last'
+    };
+    
+    updateMaxPooling2dConfig(configIndex, defaultConfig);
+    console.log(`MaxPooling2D层 ${configIndex} 设置默认值:`, defaultConfig);
+  }, [configIndex, maxPooling2dConfigs, updateMaxPooling2dConfig]);
+  
+  const config = maxPooling2dConfigs[configIndex] || {
+    pool_size: [2, 2],
+    strides: null,
+    padding: 'valid',
+    data_format: 'channels_last'
   };
 
-  const handlePaddingChange = (e) => {
-    const value = e.target.value;
-    setPadding(value);
-    updateMaxPooling2dConfig(configIndex, { ...config, padding: value });
+  const handleConfigChange = (field, value) => {
+    updateMaxPooling2dConfig(configIndex, { [field]: value });
   };
+
+  // 基本配置项
+  const basicConfig = (
+    <div className="space-y-4">
+      <InputField 
+        label="池化窗口大小" 
+        tooltip={FIELD_TOOLTIPS.pool_size}
+        required
+      >
+        <SizeSelector
+          value={config.pool_size || [2, 2]}
+          onChange={(value) => handleConfigChange('pool_size', value)}
+          options={POOL_SIZE_OPTIONS}
+          placeholder="[2, 2]"
+        />
+      </InputField>
+
+      <InputField 
+        label="填充方式" 
+        tooltip={FIELD_TOOLTIPS.padding}
+        required
+      >
+        <select
+          value={config.padding || 'valid'}
+          onChange={(e) => handleConfigChange('padding', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+        >
+          {PADDING_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <div className="text-xs text-gray-500 mt-1">
+          {PADDING_OPTIONS.find(opt => opt.value === config.padding)?.description}
+        </div>
+      </InputField>
+    </div>
+  );
+
+  // 高级配置项
+  const advancedConfig = (
+    <div className="space-y-4">
+      <InputField 
+        label="步长" 
+        tooltip={FIELD_TOOLTIPS.strides}
+      >
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={config.strides === null}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  handleConfigChange('strides', null);
+                } else {
+                  handleConfigChange('strides', config.pool_size || [2, 2]);
+                }
+              }}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <span className="text-sm text-gray-600">使用与池化大小相同的步长</span>
+          </div>
+          
+          {config.strides !== null && (
+            <SizeSelector
+              value={config.strides || [2, 2]}
+              onChange={(value) => handleConfigChange('strides', value)}
+              options={POOL_SIZE_OPTIONS}
+              placeholder="[2, 2]"
+            />
+          )}
+        </div>
+      </InputField>
+
+      <InputField 
+        label="数据格式" 
+        tooltip={FIELD_TOOLTIPS.data_format}
+      >
+        <select
+          value={config.data_format || 'channels_last'}
+          onChange={(e) => handleConfigChange('data_format', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+        >
+          {DATA_FORMAT_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </InputField>
+    </div>
+  );
 
   return (
-    <NodeContainer title="Max Pooling 2D" backgroundColor="blue-50">
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            池化大小:
-          </label>
-          <select 
-            value={poolSizeStr}
-            onChange={handlePoolSizeChange}
-            className="block w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            {POOL_SIZE_OPTIONS.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <div className="text-xs text-gray-500 mt-1">
-            当前值: [{poolSizeStr}]
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            步长:
-          </label>
-          <input 
-            type="text" 
-            value={stridesStr}
-            onChange={handleStridesChange}
-            placeholder="例如: 2,2"
-            className="block w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <div className="text-xs text-gray-500 mt-1">
-            输入格式: 数字,数字 (例如: 2,2)
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            填充方式:
-          </label>
-          <select 
-            value={padding}
-            onChange={handlePaddingChange}
-            className="block w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            {PADDING_OPTIONS.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-    </NodeContainer>
+    <NodeContainer 
+      title="MaxPooling2D Layer" 
+      backgroundColor="white"
+      borderColor="cyan-200"
+      basicConfig={basicConfig}
+      advancedConfig={advancedConfig}
+    />
   );
 }
 
