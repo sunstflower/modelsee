@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    
+    <script>
+        // First create a session
+        fetch('http://localhost:8000/sessions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                session_name: 'Test Session',
+                description: 'WebSocket test session'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Session created:', data.session_id);
+                document.getElementById('status').innerHTML = 'Session created: ' + data.session_id;
+                
+                // Now connect WebSocket
+                const ws = new WebSocket(`ws://localhost:8000/ws/${data.session_id}`);
+                
+                ws.onopen = function() {
+                    console.log('WebSocket connected');
+                    document.getElementById('status').innerHTML += '<br>WebSocket connected!';
+                    
+                    // Send ping message
+                    ws.send(JSON.stringify({
+                        type: 'ping',
+                        timestamp: new Date().toISOString()
+                    }));
+                };
+                
+                ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    console.log('WebSocket message:', data);
+                    document.getElementById('messages').innerHTML += '<br>Received: ' + JSON.stringify(data);
+                };
+                
+                ws.onclose = function(event) {
+                    console.log('WebSocket closed:', event.code, event.reason);
+                    document.getElementById('status').innerHTML += '<br>WebSocket closed: ' + event.code;
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    document.getElementById('status').innerHTML += '<br>WebSocket error!';
+                };
+            } else {
+                document.getElementById('status').innerHTML = 'Failed to create session';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('status').innerHTML = 'Error: ' + error.message;
+        });
+    </script>
+</body>
+</html> 
