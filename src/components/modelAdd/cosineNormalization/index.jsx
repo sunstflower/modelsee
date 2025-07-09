@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import useStore from '@/store';
+
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
 
@@ -9,11 +10,8 @@ const FIELD_TOOLTIPS = {
   name: "层名称 - 该层的自定义名称，用于模型可视化"
 };
 
-const CosineNormalization = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
+function CosineNormalizationNode({ data, id }) {
+  const { updateCosineNormalizationConfig } = useStore();
 
   const defaultConfig = {
     axis: -1,
@@ -22,21 +20,15 @@ const CosineNormalization = ({ id, data }) => {
   };
 
   useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
+    const newData = { ...defaultConfig, ...data };
+    if (JSON.stringify(newData) !== JSON.stringify(data)) {
+      updateCosineNormalizationConfig(id, newData);
     }
   }, []);
 
   const handleInputChange = (field, value) => {
-    const parsedValue = field === 'axis' ? 
-      parseInt(value) || defaultConfig[field] : 
-      field === 'epsilon' ? parseFloat(value) || defaultConfig[field] : value;
-    
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: parsedValue }
-    });
+    const newData = { ...data, [field]: value };
+    updateCosineNormalizationConfig(id, newData);
   };
 
   const basicConfig = (
@@ -44,7 +36,7 @@ const CosineNormalization = ({ id, data }) => {
       <InputField
         label="归一化轴"
         type="number"
-        value={nodeData.axis || defaultConfig.axis}
+        value={data.axis || defaultConfig.axis}
         onChange={(value) => handleInputChange('axis', value)}
         min="-10"
         max="10"
@@ -65,7 +57,7 @@ const CosineNormalization = ({ id, data }) => {
       <InputField
         label="Epsilon"
         type="number"
-        value={nodeData.epsilon || defaultConfig.epsilon}
+        value={data.epsilon || defaultConfig.epsilon}
         onChange={(value) => handleInputChange('epsilon', value)}
         min="1e-15"
         max="1e-6"
@@ -76,7 +68,7 @@ const CosineNormalization = ({ id, data }) => {
       <InputField
         label="层名称（可选）"
         type="text"
-        value={nodeData.name || ''}
+        value={data.name || ''}
         onChange={(value) => handleInputChange('name', value || null)}
         placeholder="自定义层名称"
         tooltip={FIELD_TOOLTIPS.name}
@@ -105,7 +97,7 @@ const CosineNormalization = ({ id, data }) => {
 
   return (
     <NodeContainer
-      id={id}
+      
       title="Cosine Normalization"
       type="normalization"
       basicConfig={basicConfig}
@@ -114,4 +106,4 @@ const CosineNormalization = ({ id, data }) => {
   );
 };
 
-export default CosineNormalization; 
+export default CosineNormalizationNode; 

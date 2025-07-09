@@ -99,6 +99,20 @@ function ActivationNode({ data }) {
   const configIndex = data.index || 0;
   const isInitialized = useRef(false);
   
+  // 根据节点类型确定默认激活函数
+  const getDefaultActivationType = () => {
+    // 如果data中有type信息，使用它来设置默认激活函数
+    if (data.type && ACTIVATION_OPTIONS.find(opt => opt.value === data.type)) {
+      return data.type;
+    }
+    // 如果data中有activationType信息
+    if (data.activationType && ACTIVATION_OPTIONS.find(opt => opt.value === data.activationType)) {
+      return data.activationType;
+    }
+    // 默认返回relu
+    return 'relu';
+  };
+  
   // 初始化配置
   useEffect(() => {
     if (isInitialized.current || (activationConfigs[configIndex] && activationConfigs[configIndex].activation)) {
@@ -108,9 +122,11 @@ function ActivationNode({ data }) {
     
     isInitialized.current = true;
     
+    const defaultActivationType = getDefaultActivationType();
+    
     // 根据后端数据结构设置默认值
     const defaultConfig = {
-      activation: 'relu',
+      activation: defaultActivationType,
       alpha: 0.3,
       max_value: null,
       negative_slope: 0.0,
@@ -119,10 +135,10 @@ function ActivationNode({ data }) {
     
     updateActivationConfig(configIndex, defaultConfig);
     console.log(`Activation层 ${configIndex} 设置默认值:`, defaultConfig);
-  }, [configIndex, activationConfigs, updateActivationConfig]);
+  }, [configIndex, activationConfigs, updateActivationConfig, data.type, data.activationType]);
   
   const config = activationConfigs[configIndex] || {
-    activation: 'relu',
+    activation: getDefaultActivationType(),
     alpha: 0.3,
     max_value: null,
     negative_slope: 0.0,
@@ -144,7 +160,7 @@ function ActivationNode({ data }) {
         required
       >
         <select
-          value={config.activation || 'relu'}
+          value={config.activation || getDefaultActivationType()}
           onChange={(e) => handleConfigChange('activation', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
         >

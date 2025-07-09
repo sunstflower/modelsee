@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import useStore from '@/store';
+
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
 
@@ -14,11 +15,8 @@ const FIELD_TOOLTIPS = {
   gamma_initializer: "Gamma初始化器 - gamma参数的初始化方法"
 };
 
-const GroupNormalization = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
+function GroupNormalizationNode({ data, id }) {
+  const { updateGroupNormalizationConfig } = useStore();
 
   // 默认配置
   const defaultConfig = {
@@ -32,22 +30,15 @@ const GroupNormalization = ({ id, data }) => {
   };
 
   useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
+    const newData = { ...defaultConfig, ...data };
+    if (JSON.stringify(newData) !== JSON.stringify(data)) {
+      updateGroupNormalizationConfig(id, newData);
     }
   }, []);
 
   const handleInputChange = (field, value) => {
-    const parsedValue = field === 'groups' || field === 'axis' ? 
-      parseInt(value) || defaultConfig[field] : 
-      field === 'epsilon' ? parseFloat(value) || defaultConfig[field] :
-      field === 'center' || field === 'scale' ? value : value;
-    
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: parsedValue }
-    });
+    const newData = { ...data, [field]: value };
+    updateGroupNormalizationConfig(id, newData);
   };
 
   // 基本配置
@@ -56,7 +47,7 @@ const GroupNormalization = ({ id, data }) => {
       <InputField
         label="分组数量"
         type="number"
-        value={nodeData.groups || defaultConfig.groups}
+        value={data.groups || defaultConfig.groups}
         onChange={(value) => handleInputChange('groups', value)}
         min="1"
         max="128"
@@ -67,14 +58,14 @@ const GroupNormalization = ({ id, data }) => {
         <InputField
           label="Center"
           type="checkbox"
-          value={nodeData.center !== undefined ? nodeData.center : defaultConfig.center}
+          value={data.center !== undefined ? data.center : defaultConfig.center}
           onChange={(value) => handleInputChange('center', value)}
           tooltip={FIELD_TOOLTIPS.center}
         />
         <InputField
           label="Scale"
           type="checkbox"
-          value={nodeData.scale !== undefined ? nodeData.scale : defaultConfig.scale}
+          value={data.scale !== undefined ? data.scale : defaultConfig.scale}
           onChange={(value) => handleInputChange('scale', value)}
           tooltip={FIELD_TOOLTIPS.scale}
         />
@@ -88,7 +79,7 @@ const GroupNormalization = ({ id, data }) => {
       <InputField
         label="归一化轴"
         type="number"
-        value={nodeData.axis || defaultConfig.axis}
+        value={data.axis || defaultConfig.axis}
         onChange={(value) => handleInputChange('axis', value)}
         min="-10"
         max="10"
@@ -98,7 +89,7 @@ const GroupNormalization = ({ id, data }) => {
       <InputField
         label="Epsilon"
         type="number"
-        value={nodeData.epsilon || defaultConfig.epsilon}
+        value={data.epsilon || defaultConfig.epsilon}
         onChange={(value) => handleInputChange('epsilon', value)}
         min="1e-8"
         max="0.01"
@@ -109,7 +100,7 @@ const GroupNormalization = ({ id, data }) => {
       <InputField
         label="Beta初始化器"
         type="select"
-        value={nodeData.beta_initializer || defaultConfig.beta_initializer}
+        value={data.beta_initializer || defaultConfig.beta_initializer}
         onChange={(value) => handleInputChange('beta_initializer', value)}
         options={[
           { value: 'zeros', label: 'Zeros' },
@@ -124,7 +115,7 @@ const GroupNormalization = ({ id, data }) => {
       <InputField
         label="Gamma初始化器"
         type="select"
-        value={nodeData.gamma_initializer || defaultConfig.gamma_initializer}
+        value={data.gamma_initializer || defaultConfig.gamma_initializer}
         onChange={(value) => handleInputChange('gamma_initializer', value)}
         options={[
           { value: 'ones', label: 'Ones' },
@@ -140,7 +131,7 @@ const GroupNormalization = ({ id, data }) => {
 
   return (
     <NodeContainer
-      id={id}
+      
       title="Group Normalization"
       type="regularization"
       basicConfig={basicConfig}
@@ -149,4 +140,4 @@ const GroupNormalization = ({ id, data }) => {
   );
 };
 
-export default GroupNormalization; 
+export default GroupNormalizationNode; 

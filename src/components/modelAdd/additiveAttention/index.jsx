@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import useStore from '@/store';
+
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
 
@@ -11,11 +12,8 @@ const FIELD_TOOLTIPS = {
   use_bias: "是否使用偏置 - 在线性变换中添加偏置项"
 };
 
-const AdditiveAttention = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
+function AdditiveAttentionNode({ data, id }) {
+  const { updateAdditiveAttentionConfig } = useStore();
 
   const defaultConfig = {
     units: 64,
@@ -26,22 +24,15 @@ const AdditiveAttention = ({ id, data }) => {
   };
 
   useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
+    const newData = { ...defaultConfig, ...data };
+    if (JSON.stringify(newData) !== JSON.stringify(data)) {
+      updateAdditiveAttentionConfig(id, newData);
     }
   }, []);
 
   const handleInputChange = (field, value) => {
-    const parsedValue = field === 'units' ? 
-      parseInt(value) || defaultConfig[field] : 
-      field === 'dropout' ? parseFloat(value) || defaultConfig[field] :
-      field === 'use_scale' || field === 'use_bias' ? value : value;
-    
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: parsedValue }
-    });
+    const newData = { ...data, [field]: value };
+    updateAdditiveAttentionConfig(id, newData);
   };
 
   const basicConfig = (
@@ -49,7 +40,7 @@ const AdditiveAttention = ({ id, data }) => {
       <InputField
         label="注意力单元数"
         type="number"
-        value={nodeData.units || defaultConfig.units}
+        value={data.units || defaultConfig.units}
         onChange={(value) => handleInputChange('units', value)}
         min="8"
         max="512"
@@ -59,7 +50,7 @@ const AdditiveAttention = ({ id, data }) => {
       <InputField
         label="激活函数"
         type="select"
-        value={nodeData.activation || defaultConfig.activation}
+        value={data.activation || defaultConfig.activation}
         onChange={(value) => handleInputChange('activation', value)}
         options={[
           { value: 'tanh', label: 'Tanh' },
@@ -74,14 +65,14 @@ const AdditiveAttention = ({ id, data }) => {
         <InputField
           label="使用缩放"
           type="checkbox"
-          value={nodeData.use_scale !== undefined ? nodeData.use_scale : defaultConfig.use_scale}
+          value={data.use_scale !== undefined ? data.use_scale : defaultConfig.use_scale}
           onChange={(value) => handleInputChange('use_scale', value)}
           tooltip={FIELD_TOOLTIPS.use_scale}
         />
         <InputField
           label="使用偏置"
           type="checkbox"
-          value={nodeData.use_bias !== undefined ? nodeData.use_bias : defaultConfig.use_bias}
+          value={data.use_bias !== undefined ? data.use_bias : defaultConfig.use_bias}
           onChange={(value) => handleInputChange('use_bias', value)}
           tooltip={FIELD_TOOLTIPS.use_bias}
         />
@@ -93,9 +84,9 @@ const AdditiveAttention = ({ id, data }) => {
     <div className="space-y-3">
       <div className="space-y-2">
         <InputField
-          label={`Dropout比率: ${((nodeData.dropout || defaultConfig.dropout) * 100).toFixed(1)}%`}
+          label={`Dropout比率: ${((data.dropout || defaultConfig.dropout) * 100).toFixed(1)}%`}
           type="range"
-          value={nodeData.dropout || defaultConfig.dropout}
+          value={data.dropout || defaultConfig.dropout}
           onChange={(value) => handleInputChange('dropout', parseFloat(value))}
           min="0"
           max="0.5"
@@ -105,7 +96,7 @@ const AdditiveAttention = ({ id, data }) => {
         <InputField
           label=""
           type="number"
-          value={nodeData.dropout || defaultConfig.dropout}
+          value={data.dropout || defaultConfig.dropout}
           onChange={(value) => handleInputChange('dropout', value)}
           min="0"
           max="0.5"
@@ -137,7 +128,7 @@ const AdditiveAttention = ({ id, data }) => {
 
   return (
     <NodeContainer
-      id={id}
+      
       title="Additive Attention"
       type="attention"
       basicConfig={basicConfig}
@@ -146,4 +137,4 @@ const AdditiveAttention = ({ id, data }) => {
   );
 };
 
-export default AdditiveAttention; 
+export default AdditiveAttentionNode; 

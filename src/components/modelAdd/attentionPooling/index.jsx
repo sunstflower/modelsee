@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import useStore from '@/store';
+
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
 
@@ -11,11 +12,8 @@ const FIELD_TOOLTIPS = {
   temperature: "温度参数 - 控制注意力分布的尖锐程度"
 };
 
-const AttentionPooling = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
+function AttentionPoolingNode({ data, id }) {
+  const { updateAttentionPoolingConfig } = useStore();
 
   const defaultConfig = {
     pool_size: 2,
@@ -26,22 +24,15 @@ const AttentionPooling = ({ id, data }) => {
   };
 
   useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
+    const newData = { ...defaultConfig, ...data };
+    if (JSON.stringify(newData) !== JSON.stringify(data)) {
+      updateAttentionPoolingConfig(id, newData);
     }
   }, []);
 
   const handleInputChange = (field, value) => {
-    const parsedValue = field === 'pool_size' ? 
-      parseInt(value) || defaultConfig[field] : 
-      field === 'dropout' || field === 'temperature' ? parseFloat(value) || defaultConfig[field] :
-      field === 'use_bias' ? value : value;
-    
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: parsedValue }
-    });
+    const newData = { ...data, [field]: value };
+    updateAttentionPoolingConfig(id, newData);
   };
 
   const basicConfig = (
@@ -49,7 +40,7 @@ const AttentionPooling = ({ id, data }) => {
       <InputField
         label="池化大小"
         type="number"
-        value={nodeData.pool_size || defaultConfig.pool_size}
+        value={data.pool_size || defaultConfig.pool_size}
         onChange={(value) => handleInputChange('pool_size', value)}
         min="1"
         max="10"
@@ -59,7 +50,7 @@ const AttentionPooling = ({ id, data }) => {
       <InputField
         label="激活函数"
         type="select"
-        value={nodeData.activation || defaultConfig.activation}
+        value={data.activation || defaultConfig.activation}
         onChange={(value) => handleInputChange('activation', value)}
         options={[
           { value: 'linear', label: 'Linear' },
@@ -74,7 +65,7 @@ const AttentionPooling = ({ id, data }) => {
       <InputField
         label="使用偏置"
         type="checkbox"
-        value={nodeData.use_bias !== undefined ? nodeData.use_bias : defaultConfig.use_bias}
+        value={data.use_bias !== undefined ? data.use_bias : defaultConfig.use_bias}
         onChange={(value) => handleInputChange('use_bias', value)}
         tooltip={FIELD_TOOLTIPS.use_bias}
       />
@@ -85,9 +76,9 @@ const AttentionPooling = ({ id, data }) => {
     <div className="space-y-3">
       <div className="space-y-2">
         <InputField
-          label={`Dropout比率: ${((nodeData.dropout || defaultConfig.dropout) * 100).toFixed(1)}%`}
+          label={`Dropout比率: ${((data.dropout || defaultConfig.dropout) * 100).toFixed(1)}%`}
           type="range"
-          value={nodeData.dropout || defaultConfig.dropout}
+          value={data.dropout || defaultConfig.dropout}
           onChange={(value) => handleInputChange('dropout', parseFloat(value))}
           min="0"
           max="0.5"
@@ -97,7 +88,7 @@ const AttentionPooling = ({ id, data }) => {
         <InputField
           label=""
           type="number"
-          value={nodeData.dropout || defaultConfig.dropout}
+          value={data.dropout || defaultConfig.dropout}
           onChange={(value) => handleInputChange('dropout', value)}
           min="0"
           max="0.5"
@@ -109,7 +100,7 @@ const AttentionPooling = ({ id, data }) => {
       <InputField
         label="温度参数"
         type="number"
-        value={nodeData.temperature || defaultConfig.temperature}
+        value={data.temperature || defaultConfig.temperature}
         onChange={(value) => handleInputChange('temperature', value)}
         min="0.1"
         max="10.0"
@@ -140,7 +131,7 @@ const AttentionPooling = ({ id, data }) => {
 
   return (
     <NodeContainer
-      id={id}
+      
       title="Attention Pooling"
       type="attention"
       basicConfig={basicConfig}
@@ -149,4 +140,4 @@ const AttentionPooling = ({ id, data }) => {
   );
 };
 
-export default AttentionPooling; 
+export default AttentionPoolingNode; 

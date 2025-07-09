@@ -35,6 +35,32 @@ import ActivationNode from '../modelAdd/activation';
 import AvgPooling2DNode from '../modelAdd/avgPooling2d';
 import GRUNode from '../modelAdd/gru';
 import ReshapeNode from '../modelAdd/reshape';
+
+// 新增的层组件导入
+import Conv1DNode from '../modelAdd/conv1d';
+import Conv3DNode from '../modelAdd/conv3d';
+import SeparableConv2DNode from '../modelAdd/separableConv2d';
+import LayerNormalizationNode from '../modelAdd/layerNormalization';
+import AlphaDropoutNode from '../modelAdd/alphaDropout';
+import MultiHeadAttentionNode from '../modelAdd/multiHeadAttention';
+import PermuteNode from '../modelAdd/permute';
+import RepeatVectorNode from '../modelAdd/repeatVector';
+import ZeroPadding2DNode from '../modelAdd/zeroPadding2d';
+import GaussianDropoutNode from '../modelAdd/gaussianDropout';
+import MaskingNode from '../modelAdd/masking';
+import Cropping2DNode from '../modelAdd/cropping2d';
+import GroupNormalizationNode from '../modelAdd/groupNormalization';
+import InstanceNormalizationNode from '../modelAdd/instanceNormalization';
+import SelfAttentionNode from '../modelAdd/selfAttention';
+import CrossAttentionNode from '../modelAdd/crossAttention';
+import AdditiveAttentionNode from '../modelAdd/additiveAttention';
+import AttentionPoolingNode from '../modelAdd/attentionPooling';
+import CosineNormalizationNode from '../modelAdd/cosineNormalization';
+import UnitNormalizationNode from '../modelAdd/unitNormalization';
+import LocalResponseNormalizationNode from '../modelAdd/localResponseNormalization';
+import SpectralNormalizationNode from '../modelAdd/spectralNormalization';
+import WeightNormalizationNode from '../modelAdd/weightNormalization';
+import LambdaNode from '../modelAdd/lambda';
 import useStore from '@/store'; 
 
 // 现代风格的样式
@@ -68,31 +94,142 @@ const connectionLineStyle = {
 
 // 节点类型映射
 const nodeTypes = {
+  // 基础组件
   useData: UseData,
   mnist: MnistData,
+  trainButton: TrainButton,
+  
+  // 基础层
+  dense: DenseNode,
   conv2d: Conv2DNode,
   maxPooling2d: MaxPooling2DNode,
-  dense: DenseNode,
-  trainButton: TrainButton,
-  dropout: DropoutNode,
-  batchNorm: BatchNormNode,
-  flatten: FlattenNode,
-  lstm: LSTMNode,
-  activation: ActivationNode,
   avgPooling2d: AvgPooling2DNode,
+  flatten: FlattenNode,
+  
+  // 高级层
+  lstm: LSTMNode,
   gru: GRUNode,
+  conv1d: Conv1DNode,
+  conv3d: Conv3DNode,
+  separableConv2d: SeparableConv2DNode,
+  
+  // 激活层（统一使用一个组件处理所有激活函数）
+  activation: ActivationNode,
+  
+  // 归一化层
+  batchNorm: BatchNormNode,
+  layerNormalization: LayerNormalizationNode,
+  groupNormalization: GroupNormalizationNode,
+  instanceNormalization: InstanceNormalizationNode,
+  cosineNormalization: CosineNormalizationNode,
+  unitNormalization: UnitNormalizationNode,
+  localResponseNormalization: LocalResponseNormalizationNode,
+  weightNormalization: WeightNormalizationNode,
+  
+  // 正则化层
+  dropout: DropoutNode,
+  alphaDropout: AlphaDropoutNode,
+  gaussianDropout: GaussianDropoutNode,
+  spectralNormalization: SpectralNormalizationNode,
+  
+  // 注意力层
+  multiHeadAttention: MultiHeadAttentionNode,
+  selfAttention: SelfAttentionNode,
+  crossAttention: CrossAttentionNode,
+  additiveAttention: AdditiveAttentionNode,
+  attentionPooling: AttentionPoolingNode,
+  
+  // 工具层
   reshape: ReshapeNode,
+  permute: PermuteNode,
+  repeatVector: RepeatVectorNode,
+  masking: MaskingNode,
+  cropping2d: Cropping2DNode,
+  zeroPadding2d: ZeroPadding2DNode,
+  lambda: LambdaNode,
+  
+  // 后端层类型别名映射（非激活函数）
+  maxpool2d: MaxPooling2DNode,
+  avgpool2d: AvgPooling2DNode,
+  batch_normalization: BatchNormNode,
+  layer_normalization: LayerNormalizationNode,
+  group_normalization: GroupNormalizationNode,
+  instance_normalization: InstanceNormalizationNode,
+  cosine_normalization: CosineNormalizationNode,
+  unit_normalization: UnitNormalizationNode,
+  local_response_normalization: LocalResponseNormalizationNode,
+  weight_normalization: WeightNormalizationNode,
+  alpha_dropout: AlphaDropoutNode,
+  gaussian_dropout: GaussianDropoutNode,
+  spectral_normalization: SpectralNormalizationNode,
+  multi_head_attention: MultiHeadAttentionNode,
+  self_attention: SelfAttentionNode,
+  cross_attention: CrossAttentionNode,
+  additive_attention: AdditiveAttentionNode,
+  attention_pooling: AttentionPoolingNode,
+  repeat_vector: RepeatVectorNode,
+  zero_padding2d: ZeroPadding2DNode,
+  separable_conv2d: SeparableConv2DNode,
+  
+  // 激活函数类型别名映射（所有激活函数都映射到activation组件）
+  relu: ActivationNode,
+  leaky_relu: ActivationNode,
+  elu: ActivationNode,
+  prelu: ActivationNode,
+  sigmoid: ActivationNode,
+  tanh: ActivationNode,
+  softmax: ActivationNode,
+  swish: ActivationNode,
+  gelu: ActivationNode,
+  mish: ActivationNode,
 };
 
 // 允许连接的节点类型组合
 const isValidConnection = (sourceType, targetType) => {
   // 数据源只能连接到处理层
   if (sourceType === 'useData' || sourceType === 'mnist') {
-    return ['conv2d', 'dense', 'flatten', 'lstm', 'gru', 'reshape'].includes(targetType);
+    return [
+      'conv2d', 'conv1d', 'conv3d', 'separableConv2d', 'separable_conv2d',
+      'dense', 'flatten', 'lstm', 'gru', 'reshape',
+      'multiHeadAttention', 'multi_head_attention', 'selfAttention', 'self_attention', 
+      'crossAttention', 'cross_attention'
+    ].includes(targetType);
   }
   
   // 大多数层可以连接到任何其他处理层
-  const processingLayers = ['conv2d', 'maxPooling2d', 'avgPooling2d', 'dense', 'dropout', 'batchNorm', 'flatten', 'lstm', 'gru', 'activation', 'reshape'];
+  const processingLayers = [
+    // 基础层
+    'conv2d', 'conv1d', 'conv3d', 'separableConv2d', 'separable_conv2d',
+    'maxPooling2d', 'maxpool2d', 'avgPooling2d', 'avgpool2d', 'dense', 'flatten',
+    
+    // 循环层
+    'lstm', 'gru',
+    
+    // 激活层
+    'activation', 'relu', 'leaky_relu', 'elu', 'prelu', 'sigmoid', 'tanh', 
+    'softmax', 'swish', 'gelu', 'mish',
+    
+    // 归一化层
+    'batchNorm', 'batch_normalization', 'layerNormalization', 'layer_normalization', 
+    'groupNormalization', 'group_normalization', 'instanceNormalization', 'instance_normalization',
+    'cosineNormalization', 'cosine_normalization', 'unitNormalization', 'unit_normalization',
+    'localResponseNormalization', 'local_response_normalization', 
+    'weightNormalization', 'weight_normalization',
+    
+    // 正则化层
+    'dropout', 'alphaDropout', 'alpha_dropout', 'gaussianDropout', 'gaussian_dropout', 
+    'spectralNormalization', 'spectral_normalization',
+    
+    // 注意力层
+    'multiHeadAttention', 'multi_head_attention', 'selfAttention', 'self_attention', 
+    'crossAttention', 'cross_attention', 'additiveAttention', 'additive_attention',
+    'attentionPooling', 'attention_pooling',
+    
+    // 工具层
+    'reshape', 'permute', 'repeatVector', 'repeat_vector', 'masking', 
+    'cropping2d', 'zeroPadding2d', 'zero_padding2d', 'lambda'
+  ];
+  
   if (processingLayers.includes(sourceType)) {
     return processingLayers.includes(targetType);
   }
@@ -133,17 +270,18 @@ function FlowComponent() {
     addNode, 
     removeNode,
     updateNodePosition,
+    // 所有层配置
     conv2dConfigs,
     maxPooling2dConfigs,
     denseConfigs,
-    reshapeConfigs,
+    dropoutConfigs,
+    batchNormConfigs,
+    flattenConfigs,
     lstmConfigs,
     gruConfigs,
     activationConfigs,
     avgPooling2dConfigs,
-    dropoutConfigs,
-    batchNormConfigs,
-    flattenConfigs,
+    reshapeConfigs,
     updateDenseConfig,
     currentProject,
     setCurrentProject,
@@ -674,174 +812,6 @@ function FlowComponent() {
     }
   }, [nodes, elements.length]);
 
-  // 添加节点的处理函数
-  const handleAddNode = useCallback((type, position) => {
-    // 检查是否已经存在相同时间戳的节点，防止重复添加
-    const currentTimestamp = Date.now();
-    const nodeId = `${type}-${currentTimestamp}`;
-    
-    // 检查节点是否已存在
-    if (elements.some(node => node.id === nodeId)) {
-      console.log(`节点${nodeId}已存在，跳过添加`);
-      return;
-    }
-    
-    let newNode = {};
-    let configIndex = 0;
-    
-    // 获取当前节点数量作为序列ID
-    const sequenceId = elements.length;
-    
-    // 根据节点类型创建不同的节点
-    if (type === 'conv2d') {
-      configIndex = conv2dConfigs.length;
-      newNode = {
-        id: nodeId,
-        type: 'conv2d',
-        data: { 
-          index: configIndex,
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'maxPooling2d') {
-      configIndex = maxPooling2dConfigs.length;
-      newNode = {
-        id: nodeId,
-        type: 'maxPooling2d',
-        data: { 
-          index: configIndex,
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'dense') {
-      configIndex = denseConfigs.length;
-      newNode = {
-        id: nodeId,
-        type: 'dense',
-        data: { 
-          index: configIndex,
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'trainButton') {
-      newNode = {
-        id: nodeId,
-        type: 'trainButton',
-        data: { 
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'useData') {
-      newNode = {
-        id: nodeId,
-        type: 'useData',
-        data: { 
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'mnist') {
-      newNode = {
-        id: nodeId,
-        type: 'mnist',
-        data: { 
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'dropout') {
-      newNode = {
-        id: nodeId,
-        type: 'dropout',
-        data: { 
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'batchNorm') {
-      newNode = {
-        id: nodeId,
-        type: 'batchNorm',
-        data: { 
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'flatten') {
-      newNode = {
-        id: nodeId,
-        type: 'flatten',
-        data: { 
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'lstm') {
-      newNode = {
-        id: nodeId,
-        type: 'lstm',
-        data: { 
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'activation') {
-      newNode = {
-        id: nodeId,
-        type: 'activation',
-        data: { 
-          index: 0,
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'avgPooling2d') {
-      newNode = {
-        id: nodeId,
-        type: 'avgPooling2d',
-        data: { 
-          index: 0,
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'gru') {
-      newNode = {
-        id: nodeId,
-        type: 'gru',
-        data: { 
-          index: 0,
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    } else if (type === 'reshape') {
-      newNode = {
-        id: nodeId,
-        type: 'reshape',
-        data: { 
-          index: 0,
-          sequenceId: sequenceId 
-        },
-        position,
-      };
-    }
-    
-    // 添加节点到状态中
-    addNode(type, configIndex, nodeId);
-    setElements((els) => [...els, newNode]);
-    
-    // 尝试自动连接到前一个节点
-    const newEdges = tryConnectToLastNode(newNode, elements);
-    if (newEdges.length > 0) {
-      setEdges(edges => [...edges, ...newEdges]);
-    }
-  }, [addNode, conv2dConfigs.length, maxPooling2dConfigs.length, denseConfigs.length, elements, edges]);
-
   // 新的节点处理函数，支持后端层信息
   const handleAddNodeFromBackend = useCallback((layerType, position, layerInfo) => {
     console.log('Adding node from backend:', { layerType, position, layerInfo });
@@ -849,10 +819,14 @@ function FlowComponent() {
     const nodeId = `${layerType}-${Date.now()}`;
     const sequenceId = elements.length;
     
+    // 判断是否为激活函数类型
+    const activationTypes = ['relu', 'leaky_relu', 'elu', 'prelu', 'sigmoid', 'tanh', 'softmax', 'swish', 'gelu', 'mish'];
+    const isActivationFunction = activationTypes.includes(layerType);
+    
     // 创建节点基础结构
     const baseNode = {
       id: nodeId,
-      type: layerType,
+      type: isActivationFunction ? 'activation' : layerType,
       position: position,
       data: { 
         index: 0,
@@ -862,47 +836,38 @@ function FlowComponent() {
       }
     };
     
-    // 根据层类型设置特定配置
-    let configIndex = 0;
-    switch (layerType) {
-      case 'conv2d':
-        configIndex = conv2dConfigs.length;
-        break;
-      case 'maxpool2d':
-      case 'maxpooling2d':
-        configIndex = maxPooling2dConfigs.length;
-        break;
-      case 'dense':
-      case 'linear':
-        configIndex = denseConfigs.length;
-        break;
-      case 'dropout':
-        configIndex = dropoutConfigs.length;
-        break;
-      case 'batch_normalization':
-      case 'batchNorm':
-        configIndex = batchNormConfigs.length;
-        break;
-      case 'flatten':
-        configIndex = flattenConfigs.length;
-        break;
-      case 'lstm':
-        configIndex = lstmConfigs.length;
-        break;
-      case 'gru':
-        configIndex = gruConfigs.length;
-        break;
-      case 'reshape':
-        configIndex = reshapeConfigs.length;
-        break;
-      default:
-        configIndex = 0;
+    // 如果是激活函数，添加激活函数类型信息
+    if (isActivationFunction) {
+      baseNode.data.activationType = layerType;
+      baseNode.data.type = layerType;
     }
     
+    // 简化的配置索引处理 - 只为store中有配置的层类型设置索引
+    const configMappings = {
+      conv2d: conv2dConfigs.length,
+      maxpool2d: maxPooling2dConfigs.length,
+      maxpooling2d: maxPooling2dConfigs.length,
+      dense: denseConfigs.length,
+      linear: denseConfigs.length,
+      dropout: dropoutConfigs.length,
+      batch_normalization: batchNormConfigs.length,
+      batchNorm: batchNormConfigs.length,
+      flatten: flattenConfigs.length,
+      lstm: lstmConfigs.length,
+      gru: gruConfigs.length,
+      activation: activationConfigs.length,
+      reshape: reshapeConfigs.length,
+      avgpooling2d: avgPooling2dConfigs.length,
+      avgPooling2d: avgPooling2dConfigs.length,
+      // 所有激活函数类型都使用activation配置
+      ...Object.fromEntries(activationTypes.map(type => [type, activationConfigs.length]))
+    };
+    
+    const configIndex = configMappings[layerType] || configMappings[baseNode.type] || 0;
     baseNode.data.index = configIndex;
     
     // 添加节点到store和本地状态
-    addNode(layerType, configIndex, nodeId);
+    addNode(isActivationFunction ? 'activation' : layerType, configIndex, nodeId);
     setElements((els) => [...els, baseNode]);
     
     // 尝试自动连接到前一个节点
@@ -914,7 +879,8 @@ function FlowComponent() {
     console.log('Node added successfully:', baseNode);
   }, [addNode, conv2dConfigs.length, maxPooling2dConfigs.length, denseConfigs.length, 
       dropoutConfigs.length, batchNormConfigs.length, flattenConfigs.length,
-      lstmConfigs.length, gruConfigs.length, reshapeConfigs.length, elements, edges]);
+      lstmConfigs.length, gruConfigs.length, reshapeConfigs.length, 
+      activationConfigs.length, avgPooling2dConfigs.length, elements, edges]);
 
   // 使用ReactDnD处理拖拽
   const [{ isOver }, drop] = useDrop({

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import useStore from '@/store';
+
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
 
@@ -8,11 +9,8 @@ const FIELD_TOOLTIPS = {
   name: "层名称 - 该层的自定义名称，用于模型可视化"
 };
 
-const WeightNormalization = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
+function WeightNormalizationNode({ data, id }) {
+  const { updateWeightNormalizationConfig } = useStore();
 
   const defaultConfig = {
     dim: 0,
@@ -20,20 +18,15 @@ const WeightNormalization = ({ id, data }) => {
   };
 
   useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
+    const newData = { ...defaultConfig, ...data };
+    if (JSON.stringify(newData) !== JSON.stringify(data)) {
+      updateWeightNormalizationConfig(id, newData);
     }
   }, []);
 
   const handleInputChange = (field, value) => {
-    const parsedValue = field === 'dim' ? 
-      parseInt(value) || defaultConfig[field] : value;
-    
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: parsedValue }
-    });
+    const newData = { ...data, [field]: value };
+    updateWeightNormalizationConfig(id, newData);
   };
 
   const basicConfig = (
@@ -41,7 +34,7 @@ const WeightNormalization = ({ id, data }) => {
       <InputField
         label="归一化维度"
         type="number"
-        value={nodeData.dim || defaultConfig.dim}
+        value={data.dim || defaultConfig.dim}
         onChange={(value) => handleInputChange('dim', value)}
         min="0"
         max="3"
@@ -62,7 +55,7 @@ const WeightNormalization = ({ id, data }) => {
       <InputField
         label="层名称（可选）"
         type="text"
-        value={nodeData.name || ''}
+        value={data.name || ''}
         onChange={(value) => handleInputChange('name', value || null)}
         placeholder="自定义层名称"
         tooltip={FIELD_TOOLTIPS.name}
@@ -101,7 +94,7 @@ const WeightNormalization = ({ id, data }) => {
 
   return (
     <NodeContainer
-      id={id}
+      
       title="Weight Normalization"
       type="normalization"
       basicConfig={basicConfig}
@@ -110,4 +103,4 @@ const WeightNormalization = ({ id, data }) => {
   );
 };
 
-export default WeightNormalization; 
+export default WeightNormalizationNode; 

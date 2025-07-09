@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import useStore from '@/store';
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
 
@@ -13,11 +13,8 @@ const FIELD_TOOLTIPS = {
   gamma_initializer: "Gamma初始化器 - gamma参数的初始化方法"
 };
 
-const InstanceNormalization = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
+function InstanceNormalizationNode({ data, id }) {
+  const { updateInstanceNormalizationConfig } = useStore();
 
   // 默认配置
   const defaultConfig = {
@@ -30,22 +27,15 @@ const InstanceNormalization = ({ id, data }) => {
   };
 
   useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
+    const newData = { ...defaultConfig, ...data };
+    if (JSON.stringify(newData) !== JSON.stringify(data)) {
+      updateInstanceNormalizationConfig(id, newData);
     }
   }, []);
 
   const handleInputChange = (field, value) => {
-    const parsedValue = field === 'axis' ? 
-      parseInt(value) || defaultConfig[field] : 
-      field === 'epsilon' ? parseFloat(value) || defaultConfig[field] :
-      field === 'center' || field === 'scale' ? value : value;
-    
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: parsedValue }
-    });
+    const newData = { ...data, [field]: value };
+    updateInstanceNormalizationConfig(id, newData);
   };
 
   // 基本配置
@@ -54,7 +44,7 @@ const InstanceNormalization = ({ id, data }) => {
       <InputField
         label="归一化轴"
         type="number"
-        value={nodeData.axis || defaultConfig.axis}
+        value={data.axis || defaultConfig.axis}
         onChange={(value) => handleInputChange('axis', value)}
         min="-10"
         max="10"
@@ -65,14 +55,14 @@ const InstanceNormalization = ({ id, data }) => {
         <InputField
           label="Center"
           type="checkbox"
-          value={nodeData.center !== undefined ? nodeData.center : defaultConfig.center}
+          value={data.center !== undefined ? data.center : defaultConfig.center}
           onChange={(value) => handleInputChange('center', value)}
           tooltip={FIELD_TOOLTIPS.center}
         />
         <InputField
           label="Scale"
           type="checkbox"
-          value={nodeData.scale !== undefined ? nodeData.scale : defaultConfig.scale}
+          value={data.scale !== undefined ? data.scale : defaultConfig.scale}
           onChange={(value) => handleInputChange('scale', value)}
           tooltip={FIELD_TOOLTIPS.scale}
         />
@@ -86,7 +76,7 @@ const InstanceNormalization = ({ id, data }) => {
       <InputField
         label="Epsilon"
         type="number"
-        value={nodeData.epsilon || defaultConfig.epsilon}
+        value={data.epsilon || defaultConfig.epsilon}
         onChange={(value) => handleInputChange('epsilon', value)}
         min="1e-8"
         max="0.01"
@@ -97,7 +87,7 @@ const InstanceNormalization = ({ id, data }) => {
       <InputField
         label="Beta初始化器"
         type="select"
-        value={nodeData.beta_initializer || defaultConfig.beta_initializer}
+        value={data.beta_initializer || defaultConfig.beta_initializer}
         onChange={(value) => handleInputChange('beta_initializer', value)}
         options={[
           { value: 'zeros', label: 'Zeros' },
@@ -112,7 +102,7 @@ const InstanceNormalization = ({ id, data }) => {
       <InputField
         label="Gamma初始化器"
         type="select"
-        value={nodeData.gamma_initializer || defaultConfig.gamma_initializer}
+        value={data.gamma_initializer || defaultConfig.gamma_initializer}
         onChange={(value) => handleInputChange('gamma_initializer', value)}
         options={[
           { value: 'ones', label: 'Ones' },
@@ -134,7 +124,6 @@ const InstanceNormalization = ({ id, data }) => {
 
   return (
     <NodeContainer
-      id={id}
       title="Instance Normalization"
       type="normalization"
       basicConfig={basicConfig}
@@ -143,4 +132,4 @@ const InstanceNormalization = ({ id, data }) => {
   );
 };
 
-export default InstanceNormalization; 
+export default InstanceNormalizationNode; 

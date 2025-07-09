@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import useStore from '@/store';
+
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
 
@@ -11,11 +12,8 @@ const FIELD_TOOLTIPS = {
   name: "层名称 - 该层的自定义名称，用于模型可视化"
 };
 
-const LocalResponseNormalization = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
+function LocalResponseNormalizationNode({ data, id }) {
+  const { updateLocalResponseNormalizationConfig } = useStore();
 
   const defaultConfig = {
     depth_radius: 5,
@@ -26,22 +24,15 @@ const LocalResponseNormalization = ({ id, data }) => {
   };
 
   useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
+    const newData = { ...defaultConfig, ...data };
+    if (JSON.stringify(newData) !== JSON.stringify(data)) {
+      updateLocalResponseNormalizationConfig(id, newData);
     }
   }, []);
 
   const handleInputChange = (field, value) => {
-    const parsedValue = field === 'depth_radius' ? 
-      parseInt(value) || defaultConfig[field] : 
-      field === 'bias' || field === 'alpha' || field === 'beta' ? 
-      parseFloat(value) || defaultConfig[field] : value;
-    
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: parsedValue }
-    });
+    const newData = { ...data, [field]: value };
+    updateLocalResponseNormalizationConfig(id, newData);
   };
 
   const basicConfig = (
@@ -49,7 +40,7 @@ const LocalResponseNormalization = ({ id, data }) => {
       <InputField
         label="深度半径"
         type="number"
-        value={nodeData.depth_radius || defaultConfig.depth_radius}
+        value={data.depth_radius || defaultConfig.depth_radius}
         onChange={(value) => handleInputChange('depth_radius', value)}
         min="1"
         max="20"
@@ -59,7 +50,7 @@ const LocalResponseNormalization = ({ id, data }) => {
       <InputField
         label="偏置参数"
         type="number"
-        value={nodeData.bias || defaultConfig.bias}
+        value={data.bias || defaultConfig.bias}
         onChange={(value) => handleInputChange('bias', value)}
         min="0.1"
         max="10.0"
@@ -81,7 +72,7 @@ const LocalResponseNormalization = ({ id, data }) => {
       <InputField
         label="Alpha参数"
         type="number"
-        value={nodeData.alpha || defaultConfig.alpha}
+        value={data.alpha || defaultConfig.alpha}
         onChange={(value) => handleInputChange('alpha', value)}
         min="1e-5"
         max="0.01"
@@ -92,7 +83,7 @@ const LocalResponseNormalization = ({ id, data }) => {
       <InputField
         label="Beta参数"
         type="number"
-        value={nodeData.beta || defaultConfig.beta}
+        value={data.beta || defaultConfig.beta}
         onChange={(value) => handleInputChange('beta', value)}
         min="0.1"
         max="2.0"
@@ -103,7 +94,7 @@ const LocalResponseNormalization = ({ id, data }) => {
       <InputField
         label="层名称（可选）"
         type="text"
-        value={nodeData.name || ''}
+        value={data.name || ''}
         onChange={(value) => handleInputChange('name', value || null)}
         placeholder="自定义层名称"
         tooltip={FIELD_TOOLTIPS.name}
@@ -139,7 +130,7 @@ const LocalResponseNormalization = ({ id, data }) => {
 
   return (
     <NodeContainer
-      id={id}
+      
       title="Local Response Normalization"
       type="normalization"
       basicConfig={basicConfig}
@@ -148,4 +139,4 @@ const LocalResponseNormalization = ({ id, data }) => {
   );
 };
 
-export default LocalResponseNormalization; 
+export default LocalResponseNormalizationNode; 

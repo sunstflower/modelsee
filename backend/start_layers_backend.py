@@ -15,25 +15,44 @@ logger = logging.getLogger(__name__)
 
 def check_dependencies():
     """检查依赖包是否安装"""
+    # 必需的包
     required_packages = [
         'fastapi', 'uvicorn', 'pydantic', 'pandas', 
-        'numpy', 'redis', 'tensorflow', 'torch'
+        'numpy', 'redis', 'torch'
     ]
     
-    missing_packages = []
+    # 可选的包
+    optional_packages = ['tensorflow']
     
+    missing_required = []
+    missing_optional = []
+    
+    # 检查必需包
     for package in required_packages:
         try:
             __import__(package)
             logger.info(f"✓ {package} 已安装")
         except ImportError:
-            missing_packages.append(package)
-            logger.warning(f"✗ {package} 未安装")
+            missing_required.append(package)
+            logger.error(f"✗ {package} 未安装")
     
-    if missing_packages:
-        logger.error(f"缺少依赖包: {', '.join(missing_packages)}")
+    # 检查可选包
+    for package in optional_packages:
+        try:
+            __import__(package)
+            logger.info(f"✓ {package} 已安装")
+        except ImportError:
+            missing_optional.append(package)
+            logger.warning(f"✗ {package} 未安装 (可选)")
+    
+    if missing_required:
+        logger.error(f"缺少必需依赖包: {', '.join(missing_required)}")
         logger.info("请运行: pip install -r requirements_layers.txt")
         return False
+    
+    if missing_optional:
+        logger.warning(f"缺少可选依赖包: {', '.join(missing_optional)}")
+        logger.info("某些功能可能不可用，但系统仍可正常运行")
     
     return True
 

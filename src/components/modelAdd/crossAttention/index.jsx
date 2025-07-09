@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import useStore from '@/store';
+
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
 
@@ -12,11 +13,8 @@ const FIELD_TOOLTIPS = {
   temperature: "温度参数 - 控制注意力分布的尖锐程度"
 };
 
-const CrossAttention = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
+function CrossAttentionNode({ data, id }) {
+  const { updateCrossAttentionConfig } = useStore();
 
   // 默认配置
   const defaultConfig = {
@@ -28,22 +26,15 @@ const CrossAttention = ({ id, data }) => {
   };
 
   useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
+    const newData = { ...defaultConfig, ...data };
+    if (JSON.stringify(newData) !== JSON.stringify(data)) {
+      updateCrossAttentionConfig(id, newData);
     }
   }, []);
 
   const handleInputChange = (field, value) => {
-    const parsedValue = field === 'units' ? 
-      parseInt(value) || defaultConfig[field] : 
-      field === 'dropout' || field === 'temperature' ? parseFloat(value) || defaultConfig[field] :
-      field === 'use_bias' ? value : value;
-    
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: parsedValue }
-    });
+    const newData = { ...data, [field]: value };
+    updateCrossAttentionConfig(id, newData);
   };
 
   // 基本配置
@@ -52,7 +43,7 @@ const CrossAttention = ({ id, data }) => {
       <InputField
         label="注意力单元数"
         type="number"
-        value={nodeData.units || defaultConfig.units}
+        value={data.units || defaultConfig.units}
         onChange={(value) => handleInputChange('units', value)}
         min="8"
         max="512"
@@ -62,7 +53,7 @@ const CrossAttention = ({ id, data }) => {
       <InputField
         label="激活函数"
         type="select"
-        value={nodeData.activation || defaultConfig.activation}
+        value={data.activation || defaultConfig.activation}
         onChange={(value) => handleInputChange('activation', value)}
         options={[
           { value: 'linear', label: 'Linear' },
@@ -77,7 +68,7 @@ const CrossAttention = ({ id, data }) => {
       <InputField
         label="使用偏置"
         type="checkbox"
-        value={nodeData.use_bias !== undefined ? nodeData.use_bias : defaultConfig.use_bias}
+        value={data.use_bias !== undefined ? data.use_bias : defaultConfig.use_bias}
         onChange={(value) => handleInputChange('use_bias', value)}
         tooltip={FIELD_TOOLTIPS.use_bias}
       />
@@ -89,9 +80,9 @@ const CrossAttention = ({ id, data }) => {
     <div className="space-y-3">
       <div className="space-y-2">
         <InputField
-          label={`Dropout比率: ${((nodeData.dropout || defaultConfig.dropout) * 100).toFixed(1)}%`}
+          label={`Dropout比率: ${((data.dropout || defaultConfig.dropout) * 100).toFixed(1)}%`}
           type="range"
-          value={nodeData.dropout || defaultConfig.dropout}
+          value={data.dropout || defaultConfig.dropout}
           onChange={(value) => handleInputChange('dropout', parseFloat(value))}
           min="0"
           max="0.5"
@@ -101,7 +92,7 @@ const CrossAttention = ({ id, data }) => {
         <InputField
           label=""
           type="number"
-          value={nodeData.dropout || defaultConfig.dropout}
+          value={data.dropout || defaultConfig.dropout}
           onChange={(value) => handleInputChange('dropout', value)}
           min="0"
           max="0.5"
@@ -113,7 +104,7 @@ const CrossAttention = ({ id, data }) => {
       <InputField
         label="温度参数"
         type="number"
-        value={nodeData.temperature || defaultConfig.temperature}
+        value={data.temperature || defaultConfig.temperature}
         onChange={(value) => handleInputChange('temperature', value)}
         min="0.1"
         max="10.0"
@@ -144,7 +135,7 @@ const CrossAttention = ({ id, data }) => {
 
   return (
     <NodeContainer
-      id={id}
+      
       title="Cross Attention"
       type="attention"
       basicConfig={basicConfig}
@@ -153,4 +144,4 @@ const CrossAttention = ({ id, data }) => {
   );
 };
 
-export default CrossAttention; 
+export default CrossAttentionNode; 

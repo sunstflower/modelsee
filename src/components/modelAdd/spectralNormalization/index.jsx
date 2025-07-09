@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import useStore from '@/store';
+
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
 
@@ -8,11 +9,8 @@ const FIELD_TOOLTIPS = {
   name: "层名称 - 该层的自定义名称，用于模型可视化"
 };
 
-const SpectralNormalization = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
+function SpectralNormalizationNode({ data, id }) {
+  const { updateSpectralNormalizationConfig } = useStore();
 
   const defaultConfig = {
     power_iterations: 1,
@@ -20,20 +18,15 @@ const SpectralNormalization = ({ id, data }) => {
   };
 
   useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
+    const newData = { ...defaultConfig, ...data };
+    if (JSON.stringify(newData) !== JSON.stringify(data)) {
+      updateSpectralNormalizationConfig(id, newData);
     }
   }, []);
 
   const handleInputChange = (field, value) => {
-    const parsedValue = field === 'power_iterations' ? 
-      parseInt(value) || defaultConfig[field] : value;
-    
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: parsedValue }
-    });
+    const newData = { ...data, [field]: value };
+    updateSpectralNormalizationConfig(id, newData);
   };
 
   const basicConfig = (
@@ -41,7 +34,7 @@ const SpectralNormalization = ({ id, data }) => {
       <InputField
         label="幂迭代次数"
         type="number"
-        value={nodeData.power_iterations || defaultConfig.power_iterations}
+        value={data.power_iterations || defaultConfig.power_iterations}
         onChange={(value) => handleInputChange('power_iterations', value)}
         min="1"
         max="10"
@@ -62,7 +55,7 @@ const SpectralNormalization = ({ id, data }) => {
       <InputField
         label="层名称（可选）"
         type="text"
-        value={nodeData.name || ''}
+        value={data.name || ''}
         onChange={(value) => handleInputChange('name', value || null)}
         placeholder="自定义层名称"
         tooltip={FIELD_TOOLTIPS.name}
@@ -101,7 +94,7 @@ const SpectralNormalization = ({ id, data }) => {
 
   return (
     <NodeContainer
-      id={id}
+      
       title="Spectral Normalization"
       type="regularization"
       basicConfig={basicConfig}
@@ -110,4 +103,4 @@ const SpectralNormalization = ({ id, data }) => {
   );
 };
 
-export default SpectralNormalization; 
+export default SpectralNormalizationNode; 

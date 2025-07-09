@@ -27,9 +27,8 @@ const InputField = ({ label, value, onChange, type = "text", min, max, step, too
 
 // 重复次数选择组件
 const RepeatSelector = ({ label, value, onChange, tooltip }) => {
-  const [isCustom, setIsCustom] = useState(!presetValues.includes(value));
-  
   const presetValues = [1, 5, 10, 20, 50, 100];
+  const [isCustom, setIsCustom] = useState(!presetValues.includes(value));
   
   const presets = presetValues.map(n => ({
     value: n,

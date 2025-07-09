@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
-import { useStoreActions, useStoreState } from 'easy-peasy';
+import React, { useEffect, useRef } from 'react';
 import NodeContainer from '../NodeContainer';
 import InputField from '../InputField';
+import useStore from '@/store';
 
 const FIELD_TOOLTIPS = {
   function: "自定义函数 - 定义要应用的Lambda函数，如 'lambda x: x * 2'",
@@ -11,32 +11,18 @@ const FIELD_TOOLTIPS = {
   name: "层名称 - 该层的自定义名称，用于模型可视化"
 };
 
-const Lambda = ({ id, data }) => {
-  const updateNodeData = useStoreActions(actions => actions.updateNodeData);
-  const nodes = useStoreState(state => state.nodes);
-  
-  const nodeData = nodes.find(node => node.id === id)?.data || {};
-
-  const defaultConfig = {
+function LambdaNode({ data }) {
+  // 由于store中还没有lambdaConfigs，我们暂时使用本地状态
+  const [config, setConfig] = React.useState({
     function: 'lambda x: x',
     output_shape: null,
     mask: null,
     arguments: {},
     name: null
-  };
+  });
 
-  useEffect(() => {
-    const newData = { ...defaultConfig, ...nodeData };
-    if (JSON.stringify(newData) !== JSON.stringify(nodeData)) {
-      updateNodeData({ id, data: newData });
-    }
-  }, []);
-
-  const handleInputChange = (field, value) => {
-    updateNodeData({
-      id,
-      data: { ...nodeData, [field]: value || defaultConfig[field] }
-    });
+  const handleConfigChange = (field, value) => {
+    setConfig(prev => ({ ...prev, [field]: value }));
   };
 
   const commonFunctions = [
@@ -54,22 +40,34 @@ const Lambda = ({ id, data }) => {
     <div className="space-y-3">
       <InputField
         label="Lambda函数"
-        type="select"
-        value={nodeData.function || defaultConfig.function}
-        onChange={(value) => handleInputChange('function', value)}
-        options={commonFunctions}
         tooltip={FIELD_TOOLTIPS.function}
-      />
+        required
+      >
+        <select
+          value={config.function}
+          onChange={(e) => handleConfigChange('function', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+        >
+          {commonFunctions.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </InputField>
       
       <InputField
         label="自定义函数"
-        type="textarea"
-        value={nodeData.function || defaultConfig.function}
-        onChange={(value) => handleInputChange('function', value)}
-        placeholder="lambda x: x"
-        rows="3"
         tooltip="输入自定义Lambda函数表达式"
-      />
+      >
+        <textarea
+          value={config.function}
+          onChange={(e) => handleConfigChange('function', e.target.value)}
+          placeholder="lambda x: x"
+          rows="3"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+        />
+      </InputField>
       
       <div className="p-3 bg-gray-50 rounded-lg">
         <h4 className="font-medium text-gray-800 mb-2">Lambda层</h4>
@@ -84,30 +82,29 @@ const Lambda = ({ id, data }) => {
     <div className="space-y-3">
       <InputField
         label="输出形状（可选）"
-        type="text"
-        value={nodeData.output_shape || ''}
-        onChange={(value) => handleInputChange('output_shape', value || null)}
-        placeholder="例如: (None, 128)"
         tooltip={FIELD_TOOLTIPS.output_shape}
-      />
-      
-      <InputField
-        label="掩码函数（可选）"
-        type="text"
-        value={nodeData.mask || ''}
-        onChange={(value) => handleInputChange('mask', value || null)}
-        placeholder="lambda inputs, mask: mask"
-        tooltip={FIELD_TOOLTIPS.mask}
-      />
+      >
+        <input
+          type="text"
+          value={config.output_shape || ''}
+          onChange={(e) => handleConfigChange('output_shape', e.target.value || null)}
+          placeholder="例如: (None, 128)"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+        />
+      </InputField>
       
       <InputField
         label="层名称（可选）"
-        type="text"
-        value={nodeData.name || ''}
-        onChange={(value) => handleInputChange('name', value || null)}
-        placeholder="自定义层名称"
         tooltip={FIELD_TOOLTIPS.name}
-      />
+      >
+        <input
+          type="text"
+          value={config.name || ''}
+          onChange={(e) => handleConfigChange('name', e.target.value || null)}
+          placeholder="自定义层名称"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+        />
+      </InputField>
       
       <div className="mt-4 space-y-3">
         <div className="p-3 bg-blue-50 rounded-lg">
@@ -129,29 +126,18 @@ const Lambda = ({ id, data }) => {
             <li>• 确保函数可序列化</li>
           </ul>
         </div>
-        
-        <div className="p-3 bg-green-50 rounded-lg">
-          <h4 className="font-medium text-green-800 mb-2">常用TensorFlow操作</h4>
-          <ul className="text-sm text-green-700 space-y-1">
-            <li>• tf.reduce_mean() - 求均值</li>
-            <li>• tf.reduce_sum() - 求和</li>
-            <li>• tf.expand_dims() - 扩展维度</li>
-            <li>• tf.squeeze() - 压缩维度</li>
-          </ul>
-        </div>
       </div>
     </div>
   );
 
   return (
     <NodeContainer
-      id={id}
       title="Lambda"
       type="custom"
       basicConfig={basicConfig}
       advancedConfig={advancedConfig}
     />
   );
-};
+}
 
-export default Lambda; 
+export default LambdaNode; 
