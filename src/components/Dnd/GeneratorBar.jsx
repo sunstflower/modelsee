@@ -89,6 +89,42 @@ function GeneratorBar() {
       </p>
       
       <div className="space-y-4 pb-20">
+        {/* 数据源分组 */}
+        <div>
+          <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold sticky top-16 bg-gray-50 py-1">
+            Data Sources
+          </h3>
+          <div className="space-y-2 mt-2">
+            <DraggableComponentWrapper 
+              key="useData" 
+              type="useData" 
+              label="CSV / Custom Data"
+              layerInfo={null}
+            />
+            <DraggableComponentWrapper 
+              key="mnist" 
+              type="mnist" 
+              label="MNIST Dataset"
+              layerInfo={null}
+            />
+          </div>
+        </div>
+
+        {/* 工具分组 */}
+        <div>
+          <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold sticky top-16 bg-gray-50 py-1">
+            Tools
+          </h3>
+          <div className="space-y-2 mt-2">
+            <DraggableComponentWrapper 
+              key="trainButton" 
+              type="trainButton" 
+              label="Train"
+              layerInfo={null}
+            />
+          </div>
+        </div>
+
         {Object.entries(categories).map(([categoryKey, layerTypes]) => (
           <div key={categoryKey}>
             <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold sticky top-16 bg-gray-50 py-1">

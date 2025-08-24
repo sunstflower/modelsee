@@ -13,6 +13,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime
+from types import SimpleNamespace
 import os
 import sys
 
@@ -317,15 +318,19 @@ async def get_data_preview(session_id: str, data_type: str = "raw_data"):
 async def train_model(session_id: str, config: TrainingConfig):
     """训练模型"""
     try:
-        # 检查数据是否存在
-        data_info = data_processor.get_data_info(session_id)
-        if not data_info:
-            raise HTTPException(status_code=400, detail="请先上传数据")
-        
-        # 获取训练数据
-        df = redis_cache.get_dataframe(session_id, "raw_data")
-        if df is None:
-            raise HTTPException(status_code=400, detail="未找到训练数据")
+        # 检查是否需要预先上传数据
+        has_mnist = any(getattr(layer, 'type', '') == 'mnist' for layer in config.model_structure.layers)
+        has_csv = any(getattr(layer, 'type', '') == 'useData' for layer in config.model_structure.layers)
+
+        df = None
+        if not (has_mnist or has_csv):
+            # 需要上传的数据流（例如用户CSV）
+            data_info = data_processor.get_data_info(session_id)
+            if not data_info:
+                raise HTTPException(status_code=400, detail="请先上传数据")
+            df = redis_cache.get_dataframe(session_id, "raw_data")
+            if df is None:
+                raise HTTPException(status_code=400, detail="未找到训练数据")
         
         # 根据框架选择转换器
         if config.framework.lower() == "tensorflow":

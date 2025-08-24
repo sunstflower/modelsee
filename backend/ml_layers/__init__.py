@@ -3,7 +3,7 @@ ML Layers Module - 机器学习层组件模块
 提供丰富的神经网络层组件，支持TensorFlow和PyTorch
 """
 
-from .base_layer import BaseLayer, LayerRegistry
+from .base_layer import BaseLayer, LayerRegistry, LayerConfig, ValidationResult
 from .basic_layers import *
 from .advanced_layers import *
 from .activation_layers import *
@@ -13,12 +13,15 @@ from .attention_layers import *
 from .custom_layers import *
 
 # 导出所有层类型
+
 __all__ = [
     'BaseLayer',
     'LayerRegistry',
+    'LayerConfig',
+    'ValidationResult',
     'get_all_layers',
     'get_layer_by_type',
-    'register_layer'
+    'register_layer',
 ]
 
 def get_all_layers():
