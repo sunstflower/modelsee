@@ -3,19 +3,19 @@ const cors = require('cors');
 const path = require('path');
 const { json, urlencoded } = require('body-parser');
 
-// 导入路由
-let tensorboardRoutes;
-try {
-  tensorboardRoutes = require('./tensorboard');
-  console.log('TensorBoard路由加载成功');
-} catch (error) {
-  console.error('TensorBoard路由加载失败:', error);
-  // 提供一个空路由作为后备
-  tensorboardRoutes = express.Router();
-  tensorboardRoutes.post('/prepare', (req, res) => {
-    res.status(500).json({ success: false, error: '后端模块加载失败' });
+// 简易的 TensorBoard 路由（无需外部模块）
+const tensorboardRoutes = express.Router();
+tensorboardRoutes.post('/prepare', (req, res) => {
+  const { logdir } = req.body || {};
+  const resolvedLogdir = logdir || './runs';
+  // 仅返回建议命令与访问地址，实际启动建议在后端 shell 中运行
+  return res.json({
+    success: true,
+    logdir: resolvedLogdir,
+    command: `tensorboard --logdir ${resolvedLogdir} --port 6006 --host 127.0.0.1`,
+    url: 'http://127.0.0.1:6006'
   });
-}
+});
 
 const app = express();
 const PORT = process.env.PORT || 5001;

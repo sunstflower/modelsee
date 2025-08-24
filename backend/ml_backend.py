@@ -14,6 +14,7 @@ import json
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
+import numpy as np
 import os
 import sys
 
@@ -358,42 +359,202 @@ async def train_model(session_id: str, config: TrainingConfig):
         raise HTTPException(status_code=500, detail=str(e))
 
 async def _train_model_async(session_id: str, df, config: TrainingConfig, converter):
-    """异步训练模型"""
+    """异步训练模型（TensorFlow 实训 + TensorBoard 日志）"""
     try:
-        # 发送训练开始消息
         await manager.send_message(session_id, {
             "type": "training_status",
             "status": "started",
             "message": "开始训练模型"
         })
-        
-        # 模拟训练过程
-        for epoch in range(1, 11):
-            await asyncio.sleep(1)  # 模拟训练时间
-            
-            # 发送训练进度
-            await manager.send_message(session_id, {
-                "type": "training_progress",
-                "epoch": epoch,
-                "total_epochs": 10,
-                "progress": epoch / 10,
-                "loss": 1.0 - (epoch * 0.08),  # 模拟损失下降
-                "accuracy": 0.5 + (epoch * 0.04)  # 模拟准确率提升
-            })
-        
-        # 训练完成
+
+        # 数据源判断
+        has_mnist = any(getattr(layer, 'type', '') == 'mnist' for layer in config.model_structure.layers)
+        has_csv = any(getattr(layer, 'type', '') == 'useData' for layer in config.model_structure.layers)
+
+        # 仅实现 TF 实训
+        try:
+            import tensorflow as tf
+            from tensorflow.keras import layers, models
+        except Exception as e:
+            raise RuntimeError("后端未安装 TensorFlow，请安装 requirements_ml.txt 后重试") from e
+
+        # TensorBoard 日志（包含图、直方图、profile trace）
+        logdir = os.path.join("runs", session_id, datetime.now().strftime("%Y%m%d-%H%M%S"))
+        os.makedirs(logdir, exist_ok=True)
+        tb_callback = tf.keras.callbacks.TensorBoard(
+            log_dir=logdir,
+            histogram_freq=1,
+            write_graph=True,
+            write_images=False,
+            update_freq='batch',
+            profile_batch='2,5'  # 对第2到5个batch做性能trace
+        )
+
+        # 解析结构并构建模型（覆盖常用层）
+        def _parse_shape(val):
+            if isinstance(val, (list, tuple)):
+                return list(val)
+            if isinstance(val, str):
+                s = val.replace('(', '').replace(')', '')
+                parts = [p.strip() for p in s.split(',') if p.strip()]
+                out = []
+                for p in parts:
+                    if p.lower() in ("none", "null"):
+                        out.append(None)
+                    else:
+                        try:
+                            out.append(int(p))
+                        except Exception:
+                            out.append(None)
+                return out
+            return None
+
+        proc_layers = [l for l in config.model_structure.layers if l.type not in ("mnist", "useData")]
+        model = models.Sequential()
+        first = True
+        feature_dim = None
+        if has_csv and df is not None:
+            feature_dim = df.shape[1] - 1 if df.shape[1] > 1 else 1
+
+        for l in proc_layers:
+            t = l.type
+            cfg = l.config or {}
+            if t == 'conv2d':
+                filters = int(cfg.get('filters', 32))
+                ks = cfg.get('kernelSize', 3)
+                kernel_size = tuple(ks) if isinstance(ks, (list, tuple)) else (int(ks), int(ks))
+                strides = cfg.get('strides', 1)
+                activation = cfg.get('activation', 'relu')
+                if first:
+                    if has_mnist:
+                        model.add(layers.Conv2D(filters, kernel_size, strides=strides, activation=activation, input_shape=(28, 28, 1)))
+                    else:
+                        raise RuntimeError('CSV 数据不支持 Conv2D 作为第一层')
+                else:
+                    model.add(layers.Conv2D(filters, kernel_size, strides=strides, activation=activation))
+            elif t == 'maxPooling2d':
+                pool = cfg.get('poolSize', [2, 2])
+                strides = cfg.get('strides', [2, 2])
+                model.add(layers.MaxPooling2D(pool_size=tuple(pool), strides=tuple(strides)))
+            elif t == 'avgPooling2d':
+                pool = cfg.get('poolSize', [2, 2])
+                strides = cfg.get('strides', [2, 2])
+                model.add(layers.AveragePooling2D(pool_size=tuple(pool), strides=tuple(strides)))
+            elif t == 'flatten':
+                model.add(layers.Flatten())
+            elif t == 'dense':
+                units = int(cfg.get('units', 128))
+                activation = cfg.get('activation', 'relu')
+                if first:
+                    if has_mnist:
+                        model.add(layers.Flatten(input_shape=(28, 28, 1)))
+                        model.add(layers.Dense(units, activation=activation))
+                    else:
+                        if feature_dim is None:
+                            feature_dim = 4
+                        model.add(layers.Dense(units, activation=activation, input_dim=int(feature_dim)))
+                else:
+                    model.add(layers.Dense(units, activation=activation))
+            elif t == 'dropout':
+                rate = float(cfg.get('rate', 0.5))
+                model.add(layers.Dropout(rate))
+            elif t == 'batchNorm':
+                model.add(layers.BatchNormalization())
+            elif t == 'lstm':
+                units = int(cfg.get('units', 128))
+                return_sequences = bool(cfg.get('returnSequences', False))
+                if first:
+                    steps = None
+                    feats = feature_dim if feature_dim is not None else 28
+                    model.add(layers.LSTM(units, return_sequences=return_sequences, input_shape=(steps, int(feats))))
+                else:
+                    model.add(layers.LSTM(units, return_sequences=return_sequences))
+            elif t == 'gru':
+                units = int(cfg.get('units', 128))
+                return_sequences = bool(cfg.get('returnSequences', False))
+                if first:
+                    steps = None
+                    feats = feature_dim if feature_dim is not None else 28
+                    model.add(layers.GRU(units, return_sequences=return_sequences, input_shape=(steps, int(feats))))
+                else:
+                    model.add(layers.GRU(units, return_sequences=return_sequences))
+            elif t == 'activation':
+                activation = cfg.get('activation', 'relu')
+                model.add(layers.Activation(activation))
+            elif t == 'reshape':
+                target = _parse_shape(cfg.get('targetShape'))
+                if first:
+                    if has_mnist:
+                        model.add(layers.Reshape(tuple(target or [28, 28, 1]), input_shape=(28, 28, 1)))
+                    else:
+                        if feature_dim is None:
+                            feature_dim = 4
+                        model.add(layers.Reshape(tuple(target or [1, int(feature_dim)]), input_shape=(int(feature_dim),)))
+                else:
+                    model.add(layers.Reshape(tuple(target or [1, int(feature_dim or 4)])))
+            else:
+                logger.warning(f"未支持的层类型: {t}")
+
+            if first:
+                first = False
+
+        # 编译
+        lr = float(config.training_params.get('learning_rate', 0.001))
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
+                      loss='categorical_crossentropy',
+                      metrics=['accuracy'])
+
+        # 数据
+        if has_mnist:
+            (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+            x_train = x_train.astype('float32') / 255.0
+            x_test = x_test.astype('float32') / 255.0
+            x_train = np.expand_dims(x_train, -1)
+            x_test = np.expand_dims(x_test, -1)
+            y_train = tf.keras.utils.to_categorical(y_train, 10)
+            y_test = tf.keras.utils.to_categorical(y_test, 10)
+        elif has_csv and df is not None:
+            data_np = df.values
+            X = data_np[:, :-1]
+            y_raw = data_np[:, -1]
+            classes = np.unique(y_raw)
+            class_to_idx = {c: i for i, c in enumerate(classes)}
+            y_idx = np.vectorize(lambda v: class_to_idx.get(v, 0))(y_raw)
+            num_classes = max(len(classes), 2)
+            y_cat = tf.keras.utils.to_categorical(y_idx, num_classes)
+            n = X.shape[0]
+            split = int(n * 0.8)
+            x_train, x_test = X[:split].astype('float32'), X[split:].astype('float32')
+            y_train, y_test = y_cat[:split], y_cat[split:]
+        else:
+            raise RuntimeError('未检测到数据源节点，或数据不可用')
+
+        epochs = int(config.training_params.get('epochs', 10))
+        batch_size = int(config.training_params.get('batch_size', 32))
+
+        loop = asyncio.get_running_loop()
+
+        def _fit():
+            return model.fit(
+                x_train,
+                y_train,
+                validation_data=(x_test, y_test),
+                epochs=epochs,
+                batch_size=batch_size,
+                callbacks=[tb_callback],
+                verbose=1
+            )
+
+        await loop.run_in_executor(None, _fit)
+
         await manager.send_message(session_id, {
             "type": "training_status",
             "status": "completed",
-            "message": "模型训练完成",
-            "final_metrics": {
-                "loss": 0.2,
-                "accuracy": 0.9
-            }
+            "message": "模型训练完成（TensorBoard 可查看）",
+            "tensorboard_logdir": logdir
         })
-        
-        logger.info(f"模型训练完成: {session_id}")
-        
+        logger.info(f"模型训练完成: {session_id}, 日志目录: {logdir}")
+
     except Exception as e:
         logger.error(f"异步训练失败: {e}")
         await manager.send_message(session_id, {

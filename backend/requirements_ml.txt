@@ -4,29 +4,26 @@ pydantic==2.5.0
 websockets==12.0
 python-multipart==0.0.6
 
-# TensorFlow支持
-tensorflow==2.15.0
-tensorflow-datasets==4.9.3
+# TensorFlow 支持 (Python 3.13 使用 TF 2.20)
+tensorflow==2.20.0
 
-# PyTorch支持
-torch==2.1.0
-torchvision==0.16.0
-torchaudio==2.1.0
+# PyTorch 支持（如需，可跳过安装；Apple Silicon/py3.13 可手动安装）
+# torch==2.1.0
+# torchvision==0.16.0
+# torchaudio==2.1.0
 
-# 数据处理
-numpy==1.24.3
-pandas==2.0.3
-scikit-learn==1.3.0
+# 数据处理（让 pip 自动选择 numpy 版本）
+pandas>=2.2
+# scikit-learn 暂不安装，避免 Python 3.13 兼容性问题
 
 # 可视化和监控
-matplotlib==3.7.2
-tensorboard==2.15.1
+# 可视化和监控
+tensorboard==2.20.0
 
-# 模型导出
-onnx==1.15.0
-onnxruntime==1.16.0
+# 模型导出（可选，需本地编译工具，默认关闭）
+# onnx==1.15.0
+# onnxruntime==1.16.0
 
 # 工具库
 python-dotenv==1.0.0
 aiofiles==23.2.1
-Pillow==10.0.1 

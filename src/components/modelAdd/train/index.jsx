@@ -4,6 +4,7 @@ import * as tfvis from '@tensorflow/tfjs-vis';
 import { MnistData } from '@/tfjs/data.js'; // 确保路径正确
 import useStore from '@/store'; // 确保路径正确
 import mlBackendService from '../../../services/mlBackendService';
+import { useEffect } from 'react';
 
 async function showExamples(data) {
   const surface = tfvis.visor().surface({ name: 'Input Data Examples', tab: 'Input Data' });
@@ -410,7 +411,13 @@ async function train(model, data, isCsv) {
     if (model.inputs.length > 0) {
       console.log('Model expected input shape:', model.inputs[0].shape);
     }
-    
+    // 确保模型已编译（某些构造路径可能未编译）
+    if (!model.optimizer) {
+      console.warn('Model not compiled. Auto-compiling with default settings');
+      const optimizer = tf.train.adam();
+      model.compile({ optimizer, loss: 'categoricalCrossentropy', metrics: ['accuracy'] });
+    }
+
     return await model.fit(trainXs, trainYs, {
       batchSize: 512,
       validationData: [testXs, testYs],
@@ -428,9 +435,15 @@ async function train(model, data, isCsv) {
       dataType: trainXs.dtype,
       size: trainXs.size
     });
-    
-    tfvis.show.text({ name: 'Training Error', tab: 'Model' }, 
-      `训练错误: ${error.message}\n请检查console获取更多详情。`);
+    // 避免 tfvis.show.text API 不存在导致的二次报错
+    try {
+      if (tfvis?.render?.table) {
+        const surface = { name: 'Training Error', tab: 'Model' };
+        tfvis.render.table(surface, { headers: ['Message'], values: [[`训练错误: ${error.message}`]] });
+      }
+    } catch (e) {
+      // 忽略渲染错误
+    }
       
     throw error;
   } finally {
@@ -481,6 +494,21 @@ function TrainButton() {
       }
       const sessionId = sessionResp.session_id;
       mlBackendService.connectWebSocket(sessionId);
+
+      // 打开 TensorBoard（先请求准备信息，再在新标签打开）
+      try {
+        const resp = await fetch('/api/tensorboard/prepare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ logdir: 'runs' })
+        });
+        const info = await resp.json();
+        if (info?.success && info?.url) {
+          window.open(info.url, '_blank');
+        }
+      } catch (e) {
+        console.warn('TensorBoard prepare failed:', e);
+      }
 
       // 2) 订阅基本事件（可接入 UI 提示）
       const progressLogger = (msg) => console.log('WS:', msg);
