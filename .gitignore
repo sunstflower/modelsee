@@ -42,3 +42,12 @@ Thumbs.db
 venv/
 .env/
 backend/.venv312/
+backend/runs/
+backend/node_modules/
+backend/package-lock.json
+backend/package.json
+backend/README.md
+backend/requirements.txt
+backend/setup.py
+backend/setup.cfg
+backend/setup.py

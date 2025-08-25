@@ -498,12 +498,6 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             if first:
                 first = False
 
-        # 编译
-        lr = float(config.training_params.get('learning_rate', 0.001))
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
-                      loss='categorical_crossentropy',
-                      metrics=['accuracy'])
-
         # 数据
         if has_mnist:
             (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
@@ -528,6 +522,33 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             y_train, y_test = y_cat[:split], y_cat[split:]
         else:
             raise RuntimeError('未检测到数据源节点，或数据不可用')
+
+        # 自动补齐输出层并编译
+        if has_mnist:
+            num_classes = 10
+        elif has_csv and df is not None:
+            # 对于CSV，使用已构造的y_train推断类别数
+            num_classes = int(y_train.shape[1]) if hasattr(y_train, 'shape') and len(y_train.shape) == 2 else None
+        else:
+            num_classes = None
+
+        if num_classes is not None:
+            last_layer = model.layers[-1] if model.layers else None
+            need_output_layer = True
+            if last_layer and isinstance(last_layer, layers.Dense) and getattr(last_layer, 'units', None) == num_classes:
+                need_output_layer = False
+            if need_output_layer:
+                last_name = last_layer.__class__.__name__.lower() if last_layer else ''
+                if has_mnist and last_name in ('conv2d', 'maxpooling2d', 'averagepooling2d'):
+                    model.add(layers.Flatten())
+                model.add(layers.Dense(num_classes, activation='softmax'))
+
+        lr = float(config.training_params.get('learning_rate', 0.001))
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
+            loss='categorical_crossentropy',
+            metrics=['accuracy']
+        )
 
         epochs = int(config.training_params.get('epochs', 10))
         batch_size = int(config.training_params.get('batch_size', 32))
