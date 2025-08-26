@@ -133,10 +133,9 @@ function GeneratorBar() {
             <div className="space-y-2 mt-2">
               {layerTypes.map((layerType) => {
                 const layerInfo = layers[layerType];
-                const label = layerInfo ? 
-                  layerInfo.description || layerType : 
-                  layerType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                
+                // 始终使用英文类型键作为显示名称，避免显示中文描述
+                const label = layerType;
+
                 return (
                   <DraggableComponentWrapper 
                     key={layerType} 
