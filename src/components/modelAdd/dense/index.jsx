@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import NodeContainer from '../NodeContainer';
 import useStore from '@/store';
 
@@ -67,6 +67,8 @@ function DenseNode({ data }) {
   const { denseConfigs, updateDenseConfig } = useStore();
   const configIndex = data.index || 0;
   const isInitialized = useRef(false);
+  const [extraRaw, setExtraRaw] = useState('');
+  const [extraError, setExtraError] = useState('');
   
   // 初始化配置
   useEffect(() => {
@@ -102,8 +104,19 @@ function DenseNode({ data }) {
     bias_initializer: 'zeros',
     kernel_regularizer: null,
     bias_regularizer: null,
-    activity_regularizer: null
+    activity_regularizer: null,
+    extraConfig: {}
   };
+
+  useEffect(() => {
+    try {
+      setExtraRaw(JSON.stringify(config.extraConfig || {}, null, 2));
+      setExtraError('');
+    } catch {
+      setExtraRaw('{}');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configIndex]);
 
   const handleConfigChange = (field, value) => {
     updateDenseConfig(configIndex, { [field]: value });
@@ -250,6 +263,37 @@ function DenseNode({ data }) {
           ))}
         </select>
       </InputField>
+
+      <div className="space-y-2">
+        <label className="flex items-center text-sm font-medium text-gray-700">
+          额外TF/Keras参数 (JSON)
+        </label>
+        <textarea
+          rows={6}
+          value={extraRaw}
+          onChange={(e) => setExtraRaw(e.target.value)}
+          placeholder='{"name":"dense_1","kernelRegularizer":{"type":"l2","l2":0.0005}}'
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+        />
+        {extraError && <div className="text-xs text-red-600">{extraError}</div>}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                const parsed = extraRaw ? JSON.parse(extraRaw) : {};
+                updateDenseConfig(configIndex, { extraConfig: parsed });
+                setExtraError('');
+              } catch (e) {
+                setExtraError('JSON 解析失败');
+              }
+            }}
+            className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+          >
+            保存额外参数
+          </button>
+        </div>
+      </div>
     </div>
   );
 

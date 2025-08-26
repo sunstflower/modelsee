@@ -17,6 +17,7 @@ const useStore = create((set) => ({
       strides: 1,
       activation: 'relu',
       kernelInitializer: 'varianceScaling',
+      extraConfig: {}
     },
     {
       kernelSize: 5,
@@ -24,6 +25,7 @@ const useStore = create((set) => ({
       strides: 1,
       activation: 'relu',
       kernelInitializer: 'varianceScaling',
+      extraConfig: {}
     }
   ],
   addConv2dConfig: () => set((state) => ({
@@ -33,6 +35,7 @@ const useStore = create((set) => ({
       strides: 1,
       activation: 'relu',
       kernelInitializer: 'varianceScaling',
+      extraConfig: {}
     }]
   })),
   updateConv2dConfig: (index, config) => set((state) => ({
@@ -46,16 +49,19 @@ const useStore = create((set) => ({
     {
       poolSize: [3, 3],
       strides: [3, 3],
+      extraConfig: {}
     },
     {
       poolSize: [2, 2],
       strides: [2, 2],
+      extraConfig: {}
     }
   ],
   addMaxPooling2dConfig: () => set((state) => ({
     maxPooling2dConfigs: [...state.maxPooling2dConfigs, {
       poolSize: [3, 3],
       strides: [3, 3],
+      extraConfig: {}
     }]
   })),
   updateMaxPooling2dConfig: (index, config) => set((state) => ({
@@ -68,13 +74,15 @@ const useStore = create((set) => ({
   denseConfigs: [{
     units: 10,
     kernelInitializer: 'varianceScaling',
-    activation: 'softmax'
+    activation: 'softmax',
+    extraConfig: {}
   }],
   addDenseConfig: () => set((state) => ({
     denseConfigs: [...state.denseConfigs, {
       units: 128,
       kernelInitializer: 'varianceScaling',
-      activation: 'relu'
+      activation: 'relu',
+      extraConfig: {}
     }]
   })),
   updateDenseConfig: (index, config) => set((state) => ({

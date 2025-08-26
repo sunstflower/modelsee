@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import NodeContainer from '../NodeContainer';
 import useStore from '@/store';
 
@@ -95,6 +95,8 @@ function Conv2DNode({ data }) {
   const { conv2dConfigs, updateConv2dConfig } = useStore();
   const configIndex = data.index || 0;
   const isInitialized = useRef(false);
+  const [extraRaw, setExtraRaw] = useState('');
+  const [extraError, setExtraError] = useState('');
   
   // 初始化配置
   useEffect(() => {
@@ -131,8 +133,19 @@ function Conv2DNode({ data }) {
     use_bias: true,
     kernel_initializer: 'glorot_uniform',
     bias_initializer: 'zeros',
-    dilation_rate: [1, 1]
+    dilation_rate: [1, 1],
+    extraConfig: {}
   };
+
+  useEffect(() => {
+    try {
+      setExtraRaw(JSON.stringify(config.extraConfig || {}, null, 2));
+      setExtraError('');
+    } catch {
+      setExtraRaw('{}');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configIndex]);
 
   const handleConfigChange = (field, value) => {
     updateConv2dConfig(configIndex, { [field]: value });
@@ -279,6 +292,37 @@ function Conv2DNode({ data }) {
           placeholder="[1, 1]"
         />
       </InputField>
+
+      <div className="space-y-2">
+        <label className="flex items-center text-sm font-medium text-gray-700">
+          额外TF/Keras参数 (JSON)
+        </label>
+        <textarea
+          rows={6}
+          value={extraRaw}
+          onChange={(e) => setExtraRaw(e.target.value)}
+          placeholder='{"padding":"same","kernelRegularizer":{"type":"l2","l2":0.0005}}'
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+        />
+        {extraError && <div className="text-xs text-red-600">{extraError}</div>}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                const parsed = extraRaw ? JSON.parse(extraRaw) : {};
+                updateConv2dConfig(configIndex, { extraConfig: parsed });
+                setExtraError('');
+              } catch (e) {
+                setExtraError('JSON 解析失败');
+              }
+            }}
+            className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+          >
+            保存额外参数
+          </button>
+        </div>
+      </div>
     </div>
   );
 

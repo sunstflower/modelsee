@@ -594,7 +594,12 @@ function TrainButton() {
             default:
               config = {};
           }
-          layers.push({ type: node.type, id: node.id, config });
+          // 合并额外 JSON 参数（extraConfig 优先）
+          const extra = (config && config.extraConfig) ? config.extraConfig : {};
+          const merged = { ...(config || {}) };
+          delete merged.extraConfig;
+          const finalConfig = { ...merged, ...extra };
+          layers.push({ type: node.type, id: node.id, config: finalConfig });
         }
 
         (adjacencyList[currentId] || []).forEach((nxt) => {
