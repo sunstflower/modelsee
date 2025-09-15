@@ -1,0 +1,30 @@
+{
+  "models": [
+    {
+      "id": "resnet18-mini",
+      "name": "ResNet-18 (Mini)",
+      "description": "Complete ResNet-18 with MNIST data & train button - ready to use!",
+      "framework": "tensorflow",
+      "category": "cnn",
+      "complexity": "medium",
+      "input_spec": {
+        "dataset": "mnist",
+        "shape": [28, 28, 1]
+      },
+      "ready_to_train": true
+    },
+    {
+      "id": "lenet5",
+      "name": "LeNet-5",
+      "description": "Complete LeNet-5 with MNIST data & train button - ready to use!",
+      "framework": "tensorflow", 
+      "category": "cnn",
+      "complexity": "simple",
+      "input_spec": {
+        "dataset": "mnist",
+        "shape": [28, 28, 1]
+      },
+      "ready_to_train": true
+    }
+  ]
+}

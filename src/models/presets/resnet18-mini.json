@@ -1,0 +1,141 @@
+{
+  "id": "resnet18-mini",
+  "name": "ResNet-18 (Mini)",
+  "description": "Simplified ResNet-18 architecture adapted for MNIST (28x28) with residual connections",
+  "framework": "tensorflow",
+  "category": "cnn",
+  "complexity": "medium",
+  "input_spec": {
+    "dataset": "mnist",
+    "shape": [28, 28, 1]
+  },
+  "layers": [
+    {
+      "type": "conv2d",
+      "config": {
+        "filters": 16,
+        "kernel_size": [3, 3],
+        "strides": [1, 1],
+        "padding": "same",
+        "activation": "relu",
+        "use_bias": false,
+        "name": "conv1"
+      }
+    },
+    {
+      "type": "batchNorm",
+      "config": {
+        "name": "bn1"
+      }
+    },
+    {
+      "type": "conv2d", 
+      "config": {
+        "filters": 16,
+        "kernel_size": [3, 3],
+        "strides": [1, 1],
+        "padding": "same",
+        "activation": "relu",
+        "use_bias": false,
+        "name": "res1_conv1"
+      }
+    },
+    {
+      "type": "batchNorm",
+      "config": {
+        "name": "res1_bn1"
+      }
+    },
+    {
+      "type": "conv2d",
+      "config": {
+        "filters": 16,
+        "kernel_size": [3, 3], 
+        "strides": [1, 1],
+        "padding": "same",
+        "activation": "linear",
+        "use_bias": false,
+        "name": "res1_conv2"
+      }
+    },
+    {
+      "type": "batchNorm",
+      "config": {
+        "name": "res1_bn2"
+      }
+    },
+    {
+      "type": "activation",
+      "config": {
+        "activation": "relu",
+        "name": "res1_relu"
+      }
+    },
+    {
+      "type": "conv2d",
+      "config": {
+        "filters": 32,
+        "kernel_size": [3, 3],
+        "strides": [2, 2],
+        "padding": "same", 
+        "activation": "relu",
+        "use_bias": false,
+        "name": "res2_conv1"
+      }
+    },
+    {
+      "type": "batchNorm",
+      "config": {
+        "name": "res2_bn1"
+      }
+    },
+    {
+      "type": "conv2d",
+      "config": {
+        "filters": 32,
+        "kernel_size": [3, 3],
+        "strides": [1, 1],
+        "padding": "same",
+        "activation": "linear",
+        "use_bias": false,
+        "name": "res2_conv2"
+      }
+    },
+    {
+      "type": "batchNorm",
+      "config": {
+        "name": "res2_bn2"
+      }
+    },
+    {
+      "type": "activation",
+      "config": {
+        "activation": "relu",
+        "name": "res2_relu"
+      }
+    },
+    {
+      "type": "avgPooling2d",
+      "config": {
+        "pool_size": [7, 7],
+        "strides": [1, 1],
+        "padding": "valid",
+        "name": "global_pool"
+      }
+    },
+    {
+      "type": "flatten",
+      "config": {
+        "name": "flatten"
+      }
+    },
+    {
+      "type": "dense",
+      "config": {
+        "units": 10,
+        "activation": "softmax",
+        "name": "classifier"
+      }
+    }
+  ]
+}

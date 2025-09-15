@@ -18,6 +18,8 @@ import { validateConnection, calculateModelShapes, getLayerShapeDescription, get
 import LayerTooltip from '../Tooltip/LayerTooltip';
 import projectService from '../../services/projectService';
 import mlBackendService from '../../services/mlBackendService';
+import presetModelService from '../../services/presetModelService';
+import { applyPresetToCanvas } from '../../utils/presetModelApplier';
 import Header from '../Header';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -884,7 +886,7 @@ function FlowComponent() {
 
   // 使用ReactDnD处理拖拽
   const [{ isOver }, drop] = useDrop({
-    accept: 'layer',
+    accept: ['layer', 'presetModel'],
     drop(item, monitor) {
       if (!reactFlowInstance) return;
       
@@ -906,6 +908,39 @@ function FlowComponent() {
       });
       
       console.log('Calculated position:', position);
+      
+      // 处理预置模型拖拽
+      if (item.type === 'presetModel') {
+        console.log('Applying preset model:', item.modelId);
+        
+        // 异步加载和应用预置模型
+        presetModelService.loadModelById(item.modelId)
+          .then(modelConfig => {
+            const result = applyPresetToCanvas(modelConfig, position, useStore);
+            console.log('Applied preset model:', result.modelInfo);
+            
+            // 更新本地 elements 状态（边已通过 store.addEdge 添加）
+            setElements(prevElements => [...prevElements, ...result.nodes]);
+            // 边已经通过 useStore.addEdge 添加到全局状态，无需手动更新 setEdges
+            
+            // 显示应用成功信息
+            const info = result.modelInfo;
+            const message = `✅ 已成功应用 ${info.name}!\n\n` +
+              `📊 模型层数: ${info.layerCount}\n` +
+              `📥 数据源: ${info.hasDataSource ? info.dataSourceType.toUpperCase() : '无'}\n` +
+              `🎯 训练按钮: ${info.hasTrainButton ? '已添加' : '未添加'}\n` +
+              `🚀 状态: ${info.ready ? '可直接训练' : '需要配置'}\n\n` +
+              `💡 提示: 模型已完整配置，点击 Train 按钮即可开始训练！`;
+            
+            alert(message);
+          })
+          .catch(error => {
+            console.error('Failed to apply preset model:', error);
+            alert('Failed to load preset model: ' + error.message);
+          });
+        
+        return;
+      }
       
       // 使用后端层信息或降级到本地处理
       const layerType = item.layerType || item.type;
