@@ -77,14 +77,16 @@ function NodeContainer({
             
             {/* 高级配置项 - 需要展开 */}
             {advancedConfig && (
-              <div className={`advanced-config transition-all duration-300 overflow-hidden ${
-                isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+              <div className={`advanced-config transition-all duration-300 ${
+                isExpanded ? 'max-h-[500px] opacity-100 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100' : 'max-h-0 opacity-0 overflow-hidden'
               }`}>
                 <div className="pt-3 border-t border-gray-200">
                   <div className="mb-2">
                     <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">高级配置</span>
                   </div>
-                  {advancedConfig}
+                  <div className="pr-2">
+                    {advancedConfig}
+                  </div>
                 </div>
               </div>
             )}
@@ -92,9 +94,11 @@ function NodeContainer({
         ) : (
           /* 兼容旧版本 */
           <div className={`content-container transition-all duration-300 ${
-            isExpanded ? 'max-h-96 opacity-100' : 'max-h-32 opacity-100'
-          } overflow-hidden`}>
-            {children}
+            isExpanded ? 'max-h-[500px] opacity-100 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100' : 'max-h-32 opacity-100 overflow-hidden'
+          }`}>
+            <div className="pr-2">
+              {children}
+            </div>
           </div>
         )}
       </div>

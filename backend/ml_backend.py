@@ -366,7 +366,7 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             "status": "started",
             "message": "开始训练模型"
         })
-        
+
         # 数据源判断
         has_mnist = any(getattr(layer, 'type', '') == 'mnist' for layer in config.model_structure.layers)
         has_csv = any(getattr(layer, 'type', '') == 'useData' for layer in config.model_structure.layers)
@@ -377,127 +377,6 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             from tensorflow.keras import layers, models
         except Exception as e:
             raise RuntimeError("后端未安装 TensorFlow，请安装 requirements_ml.txt 后重试") from e
-
-        # ======== Keras 参数解析辅助 ========
-        def _to_bool(val, default=None):
-            if val is None:
-                return default
-            if isinstance(val, bool):
-                return val
-            if isinstance(val, str):
-                return val.strip().lower() in ("true", "1", "yes", "y", "t")
-            return bool(val)
-
-        def _to_int(val, default=None):
-            try:
-                return int(val)
-            except Exception:
-                return default
-
-        def _to_float(val, default=None):
-            try:
-                return float(val)
-            except Exception:
-                return default
-
-        def _to_tuple2(val, default=None):
-            if val is None:
-                return default
-            if isinstance(val, (list, tuple)):
-                if len(val) == 1:
-                    return (int(val[0]), int(val[0]))
-                return (int(val[0]), int(val[1]))
-            try:
-                v = int(val)
-                return (v, v)
-            except Exception:
-                return default
-
-        def _resolve_activation(name):
-            if not name:
-                return None
-            # 直接返回字符串，Keras 可解析常见名称
-            return str(name)
-
-        def _resolve_initializer(spec):
-            if not spec:
-                return None
-            if isinstance(spec, str):
-                name = spec.strip()
-                mapping = {
-                    'glorotUniform': tf.keras.initializers.GlorotUniform,
-                    'glorotNormal': tf.keras.initializers.GlorotNormal,
-                    'heUniform': tf.keras.initializers.HeUniform,
-                    'heNormal': tf.keras.initializers.HeNormal,
-                    'lecunUniform': tf.keras.initializers.LecunUniform,
-                    'lecunNormal': tf.keras.initializers.LecunNormal,
-                    'zeros': tf.keras.initializers.Zeros,
-                    'ones': tf.keras.initializers.Ones,
-                    'randomNormal': tf.keras.initializers.RandomNormal,
-                    'randomUniform': tf.keras.initializers.RandomUniform,
-                    'orthogonal': tf.keras.initializers.Orthogonal,
-                    'varianceScaling': tf.keras.initializers.VarianceScaling,
-                }
-                ctor = mapping.get(name) or getattr(tf.keras.initializers, name, None)
-                return ctor() if ctor else None
-            if isinstance(spec, dict):
-                t = spec.get('type') or spec.get('name')
-                if not t:
-                    return None
-                return _resolve_initializer(t)
-            return None
-
-        def _resolve_regularizer(spec):
-            if not spec:
-                return None
-            if isinstance(spec, str):
-                if spec == 'l1':
-                    return tf.keras.regularizers.L1(0.01)
-                if spec == 'l2':
-                    return tf.keras.regularizers.L2(0.01)
-                if spec in ('l1l2', 'l1_l2'):
-                    return tf.keras.regularizers.L1L2(l1=0.01, l2=0.01)
-                # 允许直接传 Keras 识别的字符串
-                try:
-                    return getattr(tf.keras.regularizers, spec)()
-                except Exception:
-                    return None
-            if isinstance(spec, dict):
-                t = spec.get('type') or spec.get('name')
-                if not t:
-                    return None
-                l1v = _to_float(spec.get('l1'))
-                l2v = _to_float(spec.get('l2'))
-                if t == 'l1':
-                    return tf.keras.regularizers.L1(l1v or 0.0)
-                if t == 'l2':
-                    return tf.keras.regularizers.L2(l2v or 0.0)
-                if t in ('l1l2', 'l1_l2'):
-                    return tf.keras.regularizers.L1L2(l1=l1v or 0.0, l2=l2v or 0.0)
-            return None
-
-        def _resolve_constraint(spec):
-            if not spec:
-                return None
-            if isinstance(spec, str):
-                try:
-                    return getattr(tf.keras.constraints, spec)()
-                except Exception:
-                    return None
-            if isinstance(spec, dict):
-                t = spec.get('type') or spec.get('name')
-                if not t:
-                    return None
-                if t == 'maxNorm':
-                    max_value = _to_float(spec.get('maxValue'), 2.0)
-                    axis = _to_int(spec.get('axis'), 0)
-                    return tf.keras.constraints.MaxNorm(max_value=max_value, axis=axis)
-                if t == 'unitNorm':
-                    axis = _to_int(spec.get('axis'), 0)
-                    return tf.keras.constraints.UnitNorm(axis=axis)
-                if t == 'nonNeg':
-                    return tf.keras.constraints.NonNeg()
-            return None
 
         # TensorBoard 日志（包含图、直方图、profile trace）
         logdir = os.path.join("runs", session_id, datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -541,157 +420,66 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             t = l.type
             cfg = l.config or {}
             if t == 'conv2d':
-                filters = _to_int(cfg.get('filters'), 32)
-                ks = cfg.get('kernelSize') or cfg.get('kernel_size') or 3
-                kernel_size = _to_tuple2(ks, (3, 3))
-                strides = _to_tuple2(cfg.get('strides'), (1, 1))
-                padding = str(cfg.get('padding', 'valid')).lower()
-                use_bias = _to_bool(cfg.get('useBias') if 'useBias' in cfg else cfg.get('use_bias'), True)
-                dilation_rate = _to_tuple2(cfg.get('dilationRate') if 'dilationRate' in cfg else cfg.get('dilation_rate'), (1, 1))
-                activation = _resolve_activation(cfg.get('activation', 'relu'))
-                k_init = _resolve_initializer(cfg.get('kernelInitializer') or cfg.get('kernel_initializer'))
-                b_init = _resolve_initializer(cfg.get('biasInitializer') or cfg.get('bias_initializer'))
-                k_reg = _resolve_regularizer(cfg.get('kernelRegularizer') or cfg.get('kernel_regularizer'))
-                b_reg = _resolve_regularizer(cfg.get('biasRegularizer') or cfg.get('bias_regularizer'))
-                a_reg = _resolve_regularizer(cfg.get('activityRegularizer') or cfg.get('activity_regularizer'))
-                k_con = _resolve_constraint(cfg.get('kernelConstraint') or cfg.get('kernel_constraint'))
-                b_con = _resolve_constraint(cfg.get('biasConstraint') or cfg.get('bias_constraint'))
-                kwargs = {
-                    'filters': filters,
-                    'kernel_size': kernel_size,
-                    'strides': strides,
-                    'padding': padding,
-                    'dilation_rate': dilation_rate,
-                    'activation': activation,
-                    'use_bias': use_bias,
-                    'kernel_initializer': k_init,
-                    'bias_initializer': b_init,
-                    'kernel_regularizer': k_reg,
-                    'bias_regularizer': b_reg,
-                    'activity_regularizer': a_reg,
-                    'kernel_constraint': k_con,
-                    'bias_constraint': b_con,
-                    'name': cfg.get('name'),
-                }
+                filters = int(cfg.get('filters', 32))
+                ks = cfg.get('kernelSize', 3)
+                kernel_size = tuple(ks) if isinstance(ks, (list, tuple)) else (int(ks), int(ks))
+                strides = cfg.get('strides', 1)
+                activation = cfg.get('activation', 'relu')
                 if first:
                     if has_mnist:
-                        kwargs['input_shape'] = (28, 28, 1)
-                        model.add(layers.Conv2D(**{k: v for k, v in kwargs.items() if v is not None}))
+                        model.add(layers.Conv2D(filters, kernel_size, strides=strides, activation=activation, input_shape=(28, 28, 1)))
                     else:
                         raise RuntimeError('CSV 数据不支持 Conv2D 作为第一层')
                 else:
-                    model.add(layers.Conv2D(**{k: v for k, v in kwargs.items() if v is not None}))
+                    model.add(layers.Conv2D(filters, kernel_size, strides=strides, activation=activation))
             elif t == 'maxPooling2d':
-                pool = _to_tuple2(cfg.get('poolSize') or cfg.get('pool_size'), (2, 2))
-                strides = _to_tuple2(cfg.get('strides'), pool)
-                padding = str(cfg.get('padding', 'valid')).lower()
-                model.add(layers.MaxPooling2D(pool_size=pool, strides=strides, padding=padding))
+                pool = cfg.get('poolSize', [2, 2])
+                strides = cfg.get('strides', [2, 2])
+                model.add(layers.MaxPooling2D(pool_size=tuple(pool), strides=tuple(strides)))
             elif t == 'avgPooling2d':
-                pool = _to_tuple2(cfg.get('poolSize') or cfg.get('pool_size'), (2, 2))
-                strides = _to_tuple2(cfg.get('strides'), pool)
-                padding = str(cfg.get('padding', 'valid')).lower()
-                model.add(layers.AveragePooling2D(pool_size=pool, strides=strides, padding=padding))
+                pool = cfg.get('poolSize', [2, 2])
+                strides = cfg.get('strides', [2, 2])
+                model.add(layers.AveragePooling2D(pool_size=tuple(pool), strides=tuple(strides)))
             elif t == 'flatten':
                 model.add(layers.Flatten())
             elif t == 'dense':
-                units = _to_int(cfg.get('units'), 128)
-                activation = _resolve_activation(cfg.get('activation', 'relu'))
-                use_bias = _to_bool(cfg.get('useBias') if 'useBias' in cfg else cfg.get('use_bias'), True)
-                k_init = _resolve_initializer(cfg.get('kernelInitializer') or cfg.get('kernel_initializer'))
-                b_init = _resolve_initializer(cfg.get('biasInitializer') or cfg.get('bias_initializer'))
-                k_reg = _resolve_regularizer(cfg.get('kernelRegularizer') or cfg.get('kernel_regularizer'))
-                b_reg = _resolve_regularizer(cfg.get('biasRegularizer') or cfg.get('bias_regularizer'))
-                a_reg = _resolve_regularizer(cfg.get('activityRegularizer') or cfg.get('activity_regularizer'))
-                k_con = _resolve_constraint(cfg.get('kernelConstraint') or cfg.get('kernel_constraint'))
-                b_con = _resolve_constraint(cfg.get('biasConstraint') or cfg.get('bias_constraint'))
-                kwargs = {
-                    'units': units,
-                    'activation': activation,
-                    'use_bias': use_bias,
-                    'kernel_initializer': k_init,
-                    'bias_initializer': b_init,
-                    'kernel_regularizer': k_reg,
-                    'bias_regularizer': b_reg,
-                    'activity_regularizer': a_reg,
-                    'kernel_constraint': k_con,
-                    'bias_constraint': b_con,
-                    'name': cfg.get('name'),
-                }
+                units = int(cfg.get('units', 128))
+                activation = cfg.get('activation', 'relu')
                 if first:
                     if has_mnist:
                         model.add(layers.Flatten(input_shape=(28, 28, 1)))
-                        model.add(layers.Dense(**{k: v for k, v in kwargs.items() if v is not None}))
+                        model.add(layers.Dense(units, activation=activation))
                     else:
                         if feature_dim is None:
                             feature_dim = 4
-                        model.add(layers.Dense(**{k: v for k, v in {**kwargs, 'input_dim': int(feature_dim)}.items() if v is not None}))
+                        model.add(layers.Dense(units, activation=activation, input_dim=int(feature_dim)))
                 else:
-                    model.add(layers.Dense(**{k: v for k, v in kwargs.items() if v is not None}))
+                    model.add(layers.Dense(units, activation=activation))
             elif t == 'dropout':
-                rate = _to_float(cfg.get('rate'), 0.5)
+                rate = float(cfg.get('rate', 0.5))
                 model.add(layers.Dropout(rate))
             elif t == 'batchNorm':
-                momentum = _to_float(cfg.get('momentum'), 0.99)
-                epsilon = _to_float(cfg.get('epsilon'), 0.001)
-                center = _to_bool(cfg.get('center'), True)
-                scale = _to_bool(cfg.get('scale'), True)
-                axis = _to_int(cfg.get('axis'), -1)
-                beta_init = _resolve_initializer(cfg.get('betaInitializer') or cfg.get('beta_initializer'))
-                gamma_init = _resolve_initializer(cfg.get('gammaInitializer') or cfg.get('gamma_initializer'))
-                model.add(layers.BatchNormalization(momentum=momentum, epsilon=epsilon, center=center, scale=scale, axis=axis,
-                                                    beta_initializer=beta_init, gamma_initializer=gamma_init))
+                model.add(layers.BatchNormalization())
             elif t == 'lstm':
-                units = _to_int(cfg.get('units'), 128)
-                return_sequences = _to_bool(cfg.get('returnSequences') if 'returnSequences' in cfg else cfg.get('return_sequences'), False)
-                act = _resolve_activation(cfg.get('activation', 'tanh'))
-                ract = _resolve_activation(cfg.get('recurrentActivation') or cfg.get('recurrent_activation') or 'sigmoid')
-                use_bias = _to_bool(cfg.get('useBias') if 'useBias' in cfg else cfg.get('use_bias'), True)
-                dropout = _to_float(cfg.get('dropout'), 0.0)
-                rdrop = _to_float(cfg.get('recurrentDropout') if 'recurrentDropout' in cfg else cfg.get('recurrent_dropout'), 0.0)
-                kwargs = {
-                    'units': units,
-                    'return_sequences': return_sequences,
-                    'activation': act,
-                    'recurrent_activation': ract,
-                    'use_bias': use_bias,
-                    'dropout': dropout,
-                    'recurrent_dropout': rdrop,
-                    'name': cfg.get('name'),
-                }
+                units = int(cfg.get('units', 128))
+                return_sequences = bool(cfg.get('returnSequences', False))
                 if first:
                     steps = None
                     feats = feature_dim if feature_dim is not None else 28
-                    kwargs['input_shape'] = (steps, int(feats))
-                    model.add(layers.LSTM(**{k: v for k, v in kwargs.items() if v is not None}))
+                    model.add(layers.LSTM(units, return_sequences=return_sequences, input_shape=(steps, int(feats))))
                 else:
-                    model.add(layers.LSTM(**{k: v for k, v in kwargs.items() if v is not None}))
+                    model.add(layers.LSTM(units, return_sequences=return_sequences))
             elif t == 'gru':
-                units = _to_int(cfg.get('units'), 128)
-                return_sequences = _to_bool(cfg.get('returnSequences') if 'returnSequences' in cfg else cfg.get('return_sequences'), False)
-                act = _resolve_activation(cfg.get('activation', 'tanh'))
-                ract = _resolve_activation(cfg.get('recurrentActivation') or cfg.get('recurrent_activation') or 'sigmoid')
-                use_bias = _to_bool(cfg.get('useBias') if 'useBias' in cfg else cfg.get('use_bias'), True)
-                dropout = _to_float(cfg.get('dropout'), 0.0)
-                rdrop = _to_float(cfg.get('recurrentDropout') if 'recurrentDropout' in cfg else cfg.get('recurrent_dropout'), 0.0)
-                kwargs = {
-                    'units': units,
-                    'return_sequences': return_sequences,
-                    'activation': act,
-                    'recurrent_activation': ract,
-                    'use_bias': use_bias,
-                    'dropout': dropout,
-                    'recurrent_dropout': rdrop,
-                    'name': cfg.get('name'),
-                }
+                units = int(cfg.get('units', 128))
+                return_sequences = bool(cfg.get('returnSequences', False))
                 if first:
                     steps = None
                     feats = feature_dim if feature_dim is not None else 28
-                    kwargs['input_shape'] = (steps, int(feats))
-                    model.add(layers.GRU(**{k: v for k, v in kwargs.items() if v is not None}))
+                    model.add(layers.GRU(units, return_sequences=return_sequences, input_shape=(steps, int(feats))))
                 else:
-                    model.add(layers.GRU(**{k: v for k, v in kwargs.items() if v is not None}))
+                    model.add(layers.GRU(units, return_sequences=return_sequences))
             elif t == 'activation':
-                activation = _resolve_activation(cfg.get('activation', 'relu'))
+                activation = cfg.get('activation', 'relu')
                 model.add(layers.Activation(activation))
             elif t == 'reshape':
                 target = _parse_shape(cfg.get('targetShape'))
@@ -709,6 +497,12 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
 
             if first:
                 first = False
+
+        # 编译
+        lr = float(config.training_params.get('learning_rate', 0.001))
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
+                      loss='categorical_crossentropy',
+                      metrics=['accuracy'])
 
         # 数据
         if has_mnist:
@@ -735,33 +529,6 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
         else:
             raise RuntimeError('未检测到数据源节点，或数据不可用')
 
-        # 自动补齐输出层并编译
-        if has_mnist:
-            num_classes = 10
-        elif has_csv and df is not None:
-            # 对于CSV，使用已构造的y_train推断类别数
-            num_classes = int(y_train.shape[1]) if hasattr(y_train, 'shape') and len(y_train.shape) == 2 else None
-        else:
-            num_classes = None
-
-        if num_classes is not None:
-            last_layer = model.layers[-1] if model.layers else None
-            need_output_layer = True
-            if last_layer and isinstance(last_layer, layers.Dense) and getattr(last_layer, 'units', None) == num_classes:
-                need_output_layer = False
-            if need_output_layer:
-                last_name = last_layer.__class__.__name__.lower() if last_layer else ''
-                if has_mnist and last_name in ('conv2d', 'maxpooling2d', 'averagepooling2d'):
-                    model.add(layers.Flatten())
-                model.add(layers.Dense(num_classes, activation='softmax'))
-
-        lr = float(config.training_params.get('learning_rate', 0.001))
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
-            loss='categorical_crossentropy',
-            metrics=['accuracy']
-        )
-
         epochs = int(config.training_params.get('epochs', 10))
         batch_size = int(config.training_params.get('batch_size', 32))
 
@@ -787,7 +554,7 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             "tensorboard_logdir": logdir
         })
         logger.info(f"模型训练完成: {session_id}, 日志目录: {logdir}")
-        
+
     except Exception as e:
         logger.error(f"异步训练失败: {e}")
         await manager.send_message(session_id, {
