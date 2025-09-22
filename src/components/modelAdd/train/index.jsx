@@ -495,23 +495,25 @@ function TrainButton() {
       const sessionId = sessionResp.session_id;
       mlBackendService.connectWebSocket(sessionId);
 
-      // 打开 TensorBoard（先请求准备信息，再在新标签打开）
-      try {
-        const resp = await fetch('/api/tensorboard/prepare', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ logdir: 'runs' })
-        });
-        const info = await resp.json();
-        if (info?.success && info?.url) {
-          window.open(info.url, '_blank');
-        }
-      } catch (e) {
-        console.warn('TensorBoard prepare failed:', e);
-      }
+      // TensorBoard 将在训练完成后自动打开对应的 run
 
       // 2) 订阅基本事件（可接入 UI 提示）
-      const progressLogger = (msg) => console.log('WS:', msg);
+      const progressLogger = (msg) => {
+        console.log('WS:', msg);
+        
+        // 训练完成时，打开对应的TensorBoard run
+        if (msg.type === 'training_status' && msg.status === 'completed' && msg.tensorboard_logdir) {
+          // TensorBoard会自动显示最新的run，直接打开即可
+          const tensorboardUrl = `http://127.0.0.1:6006/`;
+          console.log('Opening TensorBoard for completed training:', msg.tensorboard_logdir);
+          
+          // 显示成功消息并打开TensorBoard
+          alert(`🎉 训练完成！\n\n📊 训练日志: ${msg.tensorboard_logdir}\n📈 TensorBoard已自动打开\n\n💡 提示: 在TensorBoard中选择最新的run查看训练结果`);
+          window.open(tensorboardUrl, '_blank');
+        } else if (msg.type === 'training_status' && msg.status === 'failed') {
+          alert(`训练失败: ${msg.message}`);
+        }
+      };
       mlBackendService.on('websocket:message', progressLogger);
 
       // 3) 生成后端需要的模型结构
