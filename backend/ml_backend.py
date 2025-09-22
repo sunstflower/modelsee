@@ -366,7 +366,7 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             "status": "started",
             "message": "开始训练模型"
         })
-
+        
         # 数据源判断
         has_mnist = any(getattr(layer, 'type', '') == 'mnist' for layer in config.model_structure.layers)
         has_csv = any(getattr(layer, 'type', '') == 'useData' for layer in config.model_structure.layers)
@@ -505,16 +505,31 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             # 确定目标类别数
             if has_mnist:
                 num_classes = 10
-                # 如果最后一层不是10个单元的Dense层或没有softmax激活，添加分类层
-                if (not isinstance(last_layer, tf.keras.layers.Dense) or 
-                    last_layer.units != num_classes or 
-                    last_layer.activation.__name__ != 'softmax'):
+                # 检查最后一层是否是正确的分类层
+                needs_classification_layer = True
+                
+                if isinstance(last_layer, tf.keras.layers.Dense):
+                    if (last_layer.units == num_classes and 
+                        hasattr(last_layer.activation, '__name__') and
+                        last_layer.activation.__name__ == 'softmax'):
+                        needs_classification_layer = False
+                
+                if needs_classification_layer:
+                    # 检查是否需要添加Flatten层
+                    # 对于卷积层、池化层等，需要先Flatten
+                    layer_types_need_flatten = (
+                        tf.keras.layers.Conv2D,
+                        tf.keras.layers.MaxPooling2D, 
+                        tf.keras.layers.AveragePooling2D,
+                        tf.keras.layers.BatchNormalization
+                    )
                     
-                    # 如果最后一层不是Flatten或Dense，先添加Flatten
-                    if (not isinstance(last_layer, tf.keras.layers.Dense) and 
-                        not isinstance(last_layer, tf.keras.layers.Flatten) and
-                        len(last_layer.output_shape) > 2):
+                    if (isinstance(last_layer, layer_types_need_flatten) or
+                        (hasattr(last_layer, '__class__') and 
+                         any(name in last_layer.__class__.__name__.lower() 
+                             for name in ['conv', 'pool', 'batch']))):
                         model.add(layers.Flatten())
+                        logger.info("自动添加Flatten层")
                     
                     model.add(layers.Dense(num_classes, activation='softmax', name='classification_output'))
                     logger.info(f"自动添加分类输出层: {num_classes} 类")
@@ -524,13 +539,19 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
                 y_raw = df.values[:, -1]
                 num_classes = len(np.unique(y_raw))
                 
-                if (not isinstance(last_layer, tf.keras.layers.Dense) or 
-                    last_layer.units != num_classes or 
-                    last_layer.activation.__name__ != 'softmax'):
-                    
-                    if (not isinstance(last_layer, tf.keras.layers.Dense) and 
-                        not isinstance(last_layer, tf.keras.layers.Flatten)):
+                needs_classification_layer = True
+                
+                if isinstance(last_layer, tf.keras.layers.Dense):
+                    if (last_layer.units == num_classes and 
+                        hasattr(last_layer.activation, '__name__') and
+                        last_layer.activation.__name__ == 'softmax'):
+                        needs_classification_layer = False
+                
+                if needs_classification_layer:
+                    # CSV数据通常不需要Flatten，但为了安全起见还是检查
+                    if not isinstance(last_layer, tf.keras.layers.Dense):
                         model.add(layers.Flatten())
+                        logger.info("自动添加Flatten层")
                     
                     model.add(layers.Dense(num_classes, activation='softmax', name='classification_output'))
                     logger.info(f"自动添加分类输出层: {num_classes} 类")
@@ -591,7 +612,7 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             "tensorboard_logdir": logdir
         })
         logger.info(f"模型训练完成: {session_id}, 日志目录: {logdir}")
-
+        
     except Exception as e:
         logger.error(f"异步训练失败: {e}")
         await manager.send_message(session_id, {
