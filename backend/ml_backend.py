@@ -498,6 +498,43 @@ async def _train_model_async(session_id: str, df, config: TrainingConfig, conver
             if first:
                 first = False
 
+        # 检查模型是否需要输出层，如果最后一层不是正确的分类层，自动添加
+        if len(model.layers) > 0:
+            last_layer = model.layers[-1]
+            
+            # 确定目标类别数
+            if has_mnist:
+                num_classes = 10
+                # 如果最后一层不是10个单元的Dense层或没有softmax激活，添加分类层
+                if (not isinstance(last_layer, tf.keras.layers.Dense) or 
+                    last_layer.units != num_classes or 
+                    last_layer.activation.__name__ != 'softmax'):
+                    
+                    # 如果最后一层不是Flatten或Dense，先添加Flatten
+                    if (not isinstance(last_layer, tf.keras.layers.Dense) and 
+                        not isinstance(last_layer, tf.keras.layers.Flatten) and
+                        len(last_layer.output_shape) > 2):
+                        model.add(layers.Flatten())
+                    
+                    model.add(layers.Dense(num_classes, activation='softmax', name='classification_output'))
+                    logger.info(f"自动添加分类输出层: {num_classes} 类")
+            
+            elif has_csv and df is not None:
+                # 对于CSV数据，根据实际标签数确定类别
+                y_raw = df.values[:, -1]
+                num_classes = len(np.unique(y_raw))
+                
+                if (not isinstance(last_layer, tf.keras.layers.Dense) or 
+                    last_layer.units != num_classes or 
+                    last_layer.activation.__name__ != 'softmax'):
+                    
+                    if (not isinstance(last_layer, tf.keras.layers.Dense) and 
+                        not isinstance(last_layer, tf.keras.layers.Flatten)):
+                        model.add(layers.Flatten())
+                    
+                    model.add(layers.Dense(num_classes, activation='softmax', name='classification_output'))
+                    logger.info(f"自动添加分类输出层: {num_classes} 类")
+
         # 编译
         lr = float(config.training_params.get('learning_rate', 0.001))
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
